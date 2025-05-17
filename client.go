@@ -1,0 +1,48 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"maunium.net/go/mautrix"
+	// "maunium.net/go/mautrix/id"
+)
+
+func main() {
+	// Initialize client with homeserver URL
+	username := "@sherlock:relaysms.me"
+	password := ".sh@221Bbs"
+	accessToken := "syt_YWRtaW4_ZWczPEThwbVkUgLGWLAr_4W8jZy"
+
+	client, err := mautrix.NewClient("http://localhost:8008", "", accessToken)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+
+	identifier := mautrix.UserIdentifier{ 
+		Type: "m.id.user", 
+		User: username, 
+	}
+
+	// Login using username and password
+	resp, err := client.Login(context.Background(), &mautrix.ReqLogin{
+		Type:     "m.login.password",
+		// User:     id.UserID(username),
+		Identifier: identifier,
+		Password: password,
+	})
+	if err != nil {
+		log.Fatalf("Login failed: %v", err)
+	}
+
+	fmt.Printf("Login successful. Access token: %s\n", resp.AccessToken)
+
+	// Logout from the session
+	_, err = client.Logout(context.Background())
+	if err != nil {
+		log.Fatalf("Logout failed: %v", err)
+	}
+
+	fmt.Println("Logout successful.")
+}
