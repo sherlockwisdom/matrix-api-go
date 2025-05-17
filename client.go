@@ -51,7 +51,18 @@ func main() {
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		fmt.Printf("Event: %s | Room: %s | From: %s\n", evt.Type, evt.RoomID, evt.Sender)
+		if evt.Type == event.EventMessage {
+			fmt.Printf(
+				"Event: %s | Room: %s | From: %s | Content: %s\n",
+				evt.Type, evt.RoomID, evt.Sender, evt.Content.Parsed,
+			)
+			return
+		}
+
+		fmt.Printf(
+			"Event: %s | Room: %s | From: %s\n",
+			evt.Type, evt.RoomID, evt.Sender,
+		)
 	})
 
 	// go func() {
