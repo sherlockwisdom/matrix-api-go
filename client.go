@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"maunium.net/go/mautrix"
-	// "maunium.net/go/mautrix/id"
+	"maunium.net/go/mautrix/id"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 	password := ".sh@221Bbs"
 	accessToken := "syt_YWRtaW4_ZWczPEThwbVkUgLGWLAr_4W8jZy"
 
-	client, err := mautrix.NewClient("http://localhost:8008", "", accessToken)
+	client, err := mautrix.NewClient("http://localhost:8008", id.UserID(username), accessToken)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
@@ -38,6 +38,20 @@ func main() {
 
 	fmt.Printf("Login successful. Access token: %s\n", resp.AccessToken)
 
+	/*
+	go func() {
+		err := client.Sync()
+		if err != nil {
+			log.Fatalf("Sync failed: %v", err)
+		}
+	}()
+	*/
+
+	err = client.Sync()
+	if err != nil {
+		log.Fatalf("Sync failed: %v", err)
+	}
+
 	// Logout from the session
 	_, err = client.Logout(context.Background())
 	if err != nil {
@@ -46,3 +60,4 @@ func main() {
 
 	fmt.Println("Logout successful.")
 }
+
