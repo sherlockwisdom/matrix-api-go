@@ -4,22 +4,32 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/id"
 )
 
-func main() {
-	// Initialize client with homeserver URL
-	username := "@sherlock:relaysms.me"
-	password := ".sh@221Bbs"
-	accessToken := "syt_YWRtaW4_ZWczPEThwbVkUgLGWLAr_4W8jZy"
+func LoadActiveSessions(client *mautrix.Client) (string, error) {
+	fmt.Println("Loading active sessions...")
 
-	client, err := mautrix.NewClient("https://relaysms.me", id.UserID(username), accessToken)
+	dbFilepath := "db/sessions.txt"
+
+	data, err := os.ReadFile(dbFilepath)
 	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
+		return "", err
 	}
+
+	accessToken := string(data)
+	client.AccessToken = accessToken
+
+	fmt.Printf("Found access token: %v -> %s", data, accessToken)
+
+	return accessToken, nil
+}
+
+func Login(client *mautrix.Client, username string, password string) {
+	fmt.Printf("Login in as %s\n", username)
 
 	identifier := mautrix.UserIdentifier{
 		Type: "m.id.user",
@@ -40,40 +50,75 @@ func main() {
 	fmt.Printf("Login successful. Access token: %s\n", resp.AccessToken)
 	client.AccessToken = resp.AccessToken
 
+	dbFilepath := "db/sessions.txt"
+	err = os.WriteFile(dbFilepath, []byte(client.AccessToken), 0644)
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Logout(client *mautrix.Client) error {
+	// Logout from the session
+	_, err := client.Logout(context.Background())
+	if err != nil {
+		log.Fatalf("Logout failed: %v", err)
+	}
+
+	// TODO: delete the session file
+
+	fmt.Println("Logout successful.")
+	return err
+}
+
+func Create(client *mautrix.Client, homeserver string, username string, password string) {
+	available, err := client.RegisterAvailable(context.Background(), username)
+	if err != nil {
+		log.Fatalf("Username availability check failed: %v", err)
+	}
+	if !available.Available {
+		log.Fatalf("Username '%s' is already taken", username)
+	}
+
+	resp, _, err := client.Register(context.Background(), &mautrix.ReqRegister{
+		Username: username,
+		Password: password,
+		Auth: map[string]interface{}{
+			"type": "m.login.dummy",
+		},
+	})
+
+	if err != nil {
+		log.Fatalf("Registration failed: %v", err)
+	}
+
+	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
+}
+
+func Sync(client *mautrix.Client, botChan chan *event.Event) {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
 		if evt.Type == event.EventMessage {
-			fmt.Printf(
-				"Event: %s | Room: %s | From: %s | Content: %s\n",
-				evt.Type, evt.RoomID, evt.Sender, evt.Content.Parsed,
-			)
+			// log.Printf(
+			// 	"Event: %s | Room: %s | From: %s | Content: %s\n",
+			// 	evt.Type, evt.RoomID, evt.Sender, evt.Content.Parsed,
+			// )
+			botChan <- evt
 			return
 		}
 
-		fmt.Printf(
-			"Event: %s | Room: %s | From: %s\n",
-			evt.Type, evt.RoomID, evt.Sender,
-		)
+		// fmt.Printf(
+		// 	"Event: %s | Room: %s | From: %s\n",
+		// 	evt.Type, evt.RoomID, evt.Sender,
+		// )
 	})
 
-	// go func() {
-	// 	if err := client.Sync(); err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
+	go func() {
+		if err := client.Sync(); err != nil {
+			panic(err)
+		}
+	}()
 
-	err = client.Sync()
-	if err != nil {
-		log.Fatalf("Sync failed: %v", err)
-	}
-
-	// Logout from the session
-	_, err = client.Logout(context.Background())
-	if err != nil {
-		log.Fatalf("Logout failed: %v", err)
-	}
-
-	fmt.Println("Logout successful.")
 }
