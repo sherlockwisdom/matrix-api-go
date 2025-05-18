@@ -10,13 +10,6 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-type EventHandlerFunc func(evt *event.Event) error
-
-// Use pointer receiver here:
-func (f *EventHandlerFunc) HandleEvent(evt *event.Event) error {
-	return (*f)(evt)
-}
-
 func main() {
 	// Initialize client with homeserver URL
 	username := "@sherlock:relaysms.me"
