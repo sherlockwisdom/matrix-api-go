@@ -2,7 +2,10 @@ module sherlock/matrix
 
 go 1.24.3
 
-require maunium.net/go/mautrix v0.24.0
+require (
+	github.com/mattn/go-sqlite3 v1.14.28
+	maunium.net/go/mautrix v0.24.0
+)
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect

@@ -71,10 +71,13 @@ func Logout(client *mautrix.Client) error {
 	return err
 }
 
-func Create(client *mautrix.Client, homeserver string, username string, password string) {
+func Create(client *mautrix.Client, username string, password string) (string, error) {
+	fmt.Printf("[+] Creating user: %s\n", username)
+
 	available, err := client.RegisterAvailable(context.Background(), username)
 	if err != nil {
 		log.Fatalf("Username availability check failed: %v", err)
+		return "", err
 	}
 	if !available.Available {
 		log.Fatalf("Username '%s' is already taken", username)
@@ -89,10 +92,24 @@ func Create(client *mautrix.Client, homeserver string, username string, password
 	})
 
 	if err != nil {
-		log.Fatalf("Registration failed: %v", err)
+		return resp.AccessToken, err
+	}
+
+	var clientDB ClientDB = ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+	clientDB.Store([]byte(client.AccessToken))
+
+	err = os.WriteFile(clientDB.filepath, []byte(client.AccessToken), 0644)
+
+	if err != nil {
+		return resp.AccessToken, err
 	}
 
 	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
+	return resp.AccessToken, nil
 }
 
 func Sync(client *mautrix.Client, botChan chan *event.Event) {

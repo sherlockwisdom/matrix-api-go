@@ -3,17 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
+func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
+	fmt.Printf(">>\tParsing image for: %v\n", url)
+	contentUrl, err := id.ParseContentURI(url)
+	if err != nil {
+		panic(err)
+	}
+	return client.DownloadBytes(context.Background(), contentUrl)
+}
+
 func (bot Bots) AddDevice(
 	client *mautrix.Client,
 	roomId string,
 	botChan chan *event.Event,
-) error {
+) {
 	// client.SendMessageEvent(
 	// 	context.Background(),
 	// 	id.RoomID(roomId),
@@ -32,23 +43,78 @@ func (bot Bots) AddDevice(
 		"!signal login",
 	)
 
-	resp := <-botChan
+	if err != nil {
+		panic(err)
+	}
 
-	for _resp := range botChan {
-		if _resp.RoomID == id.RoomID(roomId) {
-			fmt.Printf("Bot channel parsing %v, %v\n", _resp.Sender, _resp.RoomID)
-			contents := resp.Content.Raw
+	for {
+		resp := <-botChan
+		if resp.RoomID == id.RoomID(roomId) {
+			fmt.Printf("Bot channel parsing %v, %v\n", resp.Sender, resp.RoomID)
+			content := resp.Content.Raw
 
-			for key, value := range contents {
-				fmt.Printf("\t%s: %v\n", key, value)
+			// for key, value := range contents {
+			// 	fmt.Printf("\t%s: %v\n", key, value)
+			// }
+			// fmt.Printf(">> %v -> %s", contents, contents["msgtype"])
+
+			// TODO: figure out how to get the device pairing out back to the users
+			if content["msgtype"] == "m.image" {
+				rawImage, err := ParseImage(client, content["url"].(string))
+				if err != nil {
+					panic(err)
+				}
+
+				imageDownloadFilepath := "downloads/" + content["filename"].(string)
+				os.WriteFile(imageDownloadFilepath, rawImage, 0644)
+				fmt.Printf("[+] Saved image to: %s", imageDownloadFilepath)
 			}
-
-			return nil
 		}
 	}
 
 	// fmt.Printf("Expected roomID: %v, got: %v\n", id.RoomID(roomId), resp.RoomID)
 	// fmt.Printf("Expected userID: %v, got: %v\n", client.UserID, resp.ToUserID)
+}
 
-	return err
+func (bot Bots) Linked(
+	client *mautrix.Client,
+	roomId string,
+	deviceId string,
+	botChan chan *event.Event,
+) (bool, error) {
+	/*
+	* `89811738-f1ec-4793-abe5-0f7ea3794685` (+237690663592) - `CONNECTED`
+	 */
+
+	fmt.Printf("> Sending message as %v\n", client.UserID)
+
+	_, err := client.SendText(
+		context.Background(),
+		id.RoomID(roomId),
+		"!signal list-logins",
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		resp := <-botChan
+		if resp.RoomID == id.RoomID(roomId) {
+			fmt.Printf("Bot channel parsing %v, %v\n", resp.Sender, resp.RoomID)
+			content := resp.Content.Raw
+
+			// for key, value := range contents {
+			// 	fmt.Printf("\t%s: %v\n", key, value)
+			// }
+			// fmt.Printf(">> %v -> %s", contents, contents["msgtype"])
+
+			// TODO: figure out how to get the device pairing out back to the users
+			if content["msgtype"] == "m.notice" {
+				body := content["body"].(string)
+				if strings.Contains(body, deviceId) && strings.Contains(body, `CONNECTED`) {
+				}
+			}
+		}
+	}
 }
