@@ -1,6 +1,7 @@
 package main
 
 type BotsInterface interface {
+	Invite()
 	AddDevice()
 }
 

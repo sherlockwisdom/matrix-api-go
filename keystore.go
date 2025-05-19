@@ -10,7 +10,9 @@ import (
 
 type ClientDBInterface interface {
 	Init() error
-	Close()
+	Close() error
+	Fetch() (string, error)
+	Store(string) error
 }
 
 type ClientDB struct {
@@ -31,7 +33,7 @@ func (clientDb *ClientDB) Init() error {
 	CREATE CLIENTS IF NOT EXISTS clients ( 
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
 	username TEXT NOT NULL, 
-	accessToken BLOB NOT NULL, 
+	accessToken TEXT NOT NULL, 
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -49,7 +51,7 @@ func (clientDb *ClientDB) Init() error {
 	return err
 }
 
-func (clientDb *ClientDB) Store(accessToken []byte) error {
+func (clientDb *ClientDB) Store(accessToken string) error {
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err
@@ -75,9 +77,9 @@ func (clientDb *ClientDB) Store(accessToken []byte) error {
 	return nil
 }
 
-func (clientDb *ClientDB) Fetch() ([]byte, error) {
+func (clientDb *ClientDB) Fetch() (string, error) {
 	stmt, err := clientDb.connection.Prepare("select accessToken from clients where username = ?")
-	var accessToken []byte
+	var accessToken string
 
 	if err != nil {
 		return accessToken, err

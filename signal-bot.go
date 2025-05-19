@@ -20,6 +20,13 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 	return client.DownloadBytes(context.Background(), contentUrl)
 }
 
+func (bot Bots) Invite(
+	client *mautrix.Client,
+	roomId string,
+	botChan chan *event.Event,
+) {
+}
+
 func (bot Bots) AddDevice(
 	client *mautrix.Client,
 	roomId string,

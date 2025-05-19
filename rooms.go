@@ -11,7 +11,11 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-func JoinedRooms(client *mautrix.Client) ([]id.RoomID, error) {
+type Room struct {
+	id id.RoomID
+}
+
+func (r *Room) JoinedRooms(client *mautrix.Client) ([]id.RoomID, error) {
 	resp, err := client.JoinedRooms(context.Background())
 
 	if err != nil {
@@ -21,14 +25,13 @@ func JoinedRooms(client *mautrix.Client) ([]id.RoomID, error) {
 	return resp.JoinedRooms, err
 }
 
-func GetRoomMessages(
+func (r *Room) GetRoomMessages(
 	client *mautrix.Client,
-	roomId string,
 	roomChan chan *event.Event,
 ) {
 	for {
 		resp := <-roomChan
-		if resp.RoomID == id.RoomID(roomId) {
+		if resp.RoomID == id.RoomID(r.id) {
 			fmt.Printf("Room channel parsing %v, %v\n", resp.Sender, resp.RoomID)
 			content := resp.Content.Raw
 
@@ -48,4 +51,24 @@ func GetRoomMessages(
 			}
 		}
 	}
+}
+
+func (r *Room) CreateRoom(
+	client *mautrix.Client,
+	recipient string,
+) (id.RoomID, error) {
+	resp, err := client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
+		Invite:   []id.UserID{id.UserID(recipient)},
+		IsDirect: true,
+		// Preset:     "private_chat",
+		Preset:     "trusted_private_chat",
+		Visibility: "private",
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	r.id = resp.RoomID
+	return resp.RoomID, nil
 }

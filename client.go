@@ -30,6 +30,12 @@ func LoadActiveSessions(client *mautrix.Client) (string, error) {
 
 func Login(client *mautrix.Client, username string, password string) {
 	fmt.Printf("Login in as %s\n", username)
+	var clientDB ClientDB = ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+	accessToken, err := clientDB.Fetch()
 
 	identifier := mautrix.UserIdentifier{
 		Type: "m.id.user",
@@ -47,11 +53,11 @@ func Login(client *mautrix.Client, username string, password string) {
 		log.Fatalf("Login failed: %v", err)
 	}
 
-	fmt.Printf("Login successful. Access token: %s\n", resp.AccessToken)
-	client.AccessToken = resp.AccessToken
+	clientDB.Store([]byte(client.AccessToken))
 
-	dbFilepath := "db/sessions.txt"
-	err = os.WriteFile(dbFilepath, []byte(client.AccessToken), 0644)
+	defer clientDB.Close()
+
+	client.AccessToken = resp.AccessToken
 
 	if err != nil {
 		panic(err)
@@ -107,6 +113,8 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 	if err != nil {
 		return resp.AccessToken, err
 	}
+
+	client.AccessToken = resp.AccessToken
 
 	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
 	return resp.AccessToken, nil
