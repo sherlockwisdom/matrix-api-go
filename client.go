@@ -4,38 +4,42 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 )
 
-func LoadActiveSessions(client *mautrix.Client) (string, error) {
-	fmt.Println("Loading active sessions...")
+func LoadActiveSessions(
+	client *mautrix.Client,
+	username string,
+) (string, error) {
+	fmt.Println("Loading active sessions: ", username)
 
-	dbFilepath := "db/sessions.txt"
-
-	data, err := os.ReadFile(dbFilepath)
-	if err != nil {
-		return "", err
-	}
-
-	accessToken := string(data)
-	client.AccessToken = accessToken
-
-	fmt.Printf("Found access token: %v -> %s", data, accessToken)
-
-	return accessToken, nil
-}
-
-func Login(client *mautrix.Client, username string, password string) {
-	fmt.Printf("Login in as %s\n", username)
 	var clientDB ClientDB = ClientDB{
 		username: username,
 		filepath: "db/" + username + ".db",
 	}
 	clientDB.Init()
 	accessToken, err := clientDB.Fetch()
+	if err != nil {
+		panic(err)
+	}
+
+	client.AccessToken = accessToken
+
+	fmt.Printf("Found access token: %v\n", accessToken)
+
+	return accessToken, nil
+}
+
+func Login(client *mautrix.Client, username string, password string) {
+	fmt.Printf("Login in as %s\n", username)
+
+	var clientDB ClientDB = ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
 
 	identifier := mautrix.UserIdentifier{
 		Type: "m.id.user",
@@ -52,12 +56,13 @@ func Login(client *mautrix.Client, username string, password string) {
 	if err != nil {
 		log.Fatalf("Login failed: %v", err)
 	}
-
-	clientDB.Store([]byte(client.AccessToken))
-
-	defer clientDB.Close()
-
 	client.AccessToken = resp.AccessToken
+
+	err = clientDB.Store(client.AccessToken)
+
+	if err != nil {
+		log.Fatalf("Failed to store in db: %v", err)
+	}
 
 	if err != nil {
 		panic(err)
@@ -105,16 +110,14 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 		username: username,
 		filepath: "db/" + username + ".db",
 	}
-	clientDB.Init()
-	clientDB.Store([]byte(client.AccessToken))
-
-	err = os.WriteFile(clientDB.filepath, []byte(client.AccessToken), 0644)
-
-	if err != nil {
-		return resp.AccessToken, err
-	}
 
 	client.AccessToken = resp.AccessToken
+
+	clientDB.Init()
+	err = clientDB.Store(client.AccessToken)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
 	return resp.AccessToken, nil

@@ -20,6 +20,8 @@ import (
 
 - Invite the bridge
 
+- Accept all pending invites
+
 **/
 
 func CreateProcess(
@@ -42,7 +44,7 @@ func CreateProcess(
 	}
 
 	println("[+] Created room successfully")
-	return
+	client.UserID = id.UserID("@" + username + ":relaysms.me")
 }
 
 func LoginProcess(
@@ -51,11 +53,11 @@ func LoginProcess(
 	username string,
 	password string,
 ) {
-	_, err := LoadActiveSessions(client)
+	_, err := LoadActiveSessions(client, username)
 	if err != nil {
 		Login(client, username, password)
-		client.UserID = id.UserID(username)
 	}
+	client.UserID = id.UserID("@" + username + ":relaysms.me")
 }
 
 func main() {
@@ -92,6 +94,8 @@ func main() {
 	}
 
 	botChannel := make(chan *event.Event)
+	roomChannel := make(chan *event.Event)
+
 	/*
 		go func() {
 			var bot Bots = Bots{}
@@ -100,11 +104,10 @@ func main() {
 	*/
 
 	Sync(client, botChannel)
+	room.ListenJoinedRooms(client, roomChannel)
 
-	resp, err := room.JoinedRooms(client)
-
-	for index, a := range resp {
-		fmt.Println(index, a)
+	if err != nil {
+		log.Fatalf("Failed to fetched joined rooms %v", err)
 	}
 
 	// roomId := "!lqTEAwpbUhXqEsfGzL:relaysms.me"

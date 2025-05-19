@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,7 +31,7 @@ func (clientDb *ClientDB) Init() error {
 	clientDb.connection = db
 
 	_, err = db.Exec(`
-	CREATE CLIENTS IF NOT EXISTS clients ( 
+	CREATE TABLE IF NOT EXISTS clients ( 
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
 	username TEXT NOT NULL, 
 	accessToken TEXT NOT NULL, 
@@ -63,6 +64,7 @@ func (clientDb *ClientDB) Store(accessToken string) error {
 	}
 
 	defer stmt.Close()
+	fmt.Println("- Storing for username: ", clientDb.username, ", AT: "+accessToken)
 
 	_, err = stmt.Exec(clientDb.username, accessToken)
 	if err != nil {
@@ -78,6 +80,7 @@ func (clientDb *ClientDB) Store(accessToken string) error {
 }
 
 func (clientDb *ClientDB) Fetch() (string, error) {
+	fmt.Println("- Fetching username:", clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare("select accessToken from clients where username = ?")
 	var accessToken string
 
@@ -89,7 +92,7 @@ func (clientDb *ClientDB) Fetch() (string, error) {
 
 	err = stmt.QueryRow(clientDb.username).Scan(&accessToken)
 	if err != nil {
-		return accessToken, err
+		panic(err)
 	}
 	return accessToken, err
 }
