@@ -69,7 +69,12 @@ func main() {
 		panic(err)
 	}
 
-	var room Room
+	var room = Room{
+		channel: make(chan *event.Event),
+	}
+	var bot = Bots{
+		channel: make(chan *event.Event),
+	}
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -93,9 +98,6 @@ func main() {
 		return
 	}
 
-	botChannel := make(chan *event.Event)
-	roomChannel := make(chan *event.Event)
-
 	/*
 		go func() {
 			var bot Bots = Bots{}
@@ -103,8 +105,16 @@ func main() {
 		}()
 	*/
 
-	Sync(client, botChannel)
-	room.ListenJoinedRooms(client, roomChannel)
+	go func() {
+		room.ListenJoinedRooms(client)
+	}()
+
+	go func() {
+		err := Sync(client, &room, &bot)
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

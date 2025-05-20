@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -20,17 +17,9 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 	return client.DownloadBytes(context.Background(), contentUrl)
 }
 
-func (bot Bots) Invite(
-	client *mautrix.Client,
-	roomId string,
-	botChan chan *event.Event,
-) {
-}
-
 func (bot Bots) AddDevice(
 	client *mautrix.Client,
 	roomId string,
-	botChan chan *event.Event,
 ) {
 	// client.SendMessageEvent(
 	// 	context.Background(),
@@ -54,30 +43,30 @@ func (bot Bots) AddDevice(
 		panic(err)
 	}
 
-	for {
-		resp := <-botChan
-		if resp.RoomID == id.RoomID(roomId) {
-			fmt.Printf("Bot channel parsing %v, %v\n", resp.Sender, resp.RoomID)
-			content := resp.Content.Raw
+	// for {
+	// 	resp := <-botChan
+	// 	if resp.RoomID == id.RoomID(roomId) {
+	// 		fmt.Printf("Bot channel parsing %v, %v\n", resp.Sender, resp.RoomID)
+	// 		content := resp.Content.Raw
 
-			// for key, value := range contents {
-			// 	fmt.Printf("\t%s: %v\n", key, value)
-			// }
-			// fmt.Printf(">> %v -> %s", contents, contents["msgtype"])
+	// 		// for key, value := range contents {
+	// 		// 	fmt.Printf("\t%s: %v\n", key, value)
+	// 		// }
+	// 		// fmt.Printf(">> %v -> %s", contents, contents["msgtype"])
 
-			// TODO: figure out how to get the device pairing out back to the users
-			if content["msgtype"] == "m.image" {
-				rawImage, err := ParseImage(client, content["url"].(string))
-				if err != nil {
-					panic(err)
-				}
+	// 		// TODO: figure out how to get the device pairing out back to the users
+	// 		if content["msgtype"] == "m.image" {
+	// 			rawImage, err := ParseImage(client, content["url"].(string))
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
 
-				imageDownloadFilepath := "downloads/" + content["filename"].(string)
-				os.WriteFile(imageDownloadFilepath, rawImage, 0644)
-				fmt.Printf("[+] Saved image to: %s", imageDownloadFilepath)
-			}
-		}
-	}
+	// 			imageDownloadFilepath := "downloads/" + content["filename"].(string)
+	// 			os.WriteFile(imageDownloadFilepath, rawImage, 0644)
+	// 			fmt.Printf("[+] Saved image to: %s", imageDownloadFilepath)
+	// 		}
+	// 	}
+	// }
 
 	// fmt.Printf("Expected roomID: %v, got: %v\n", id.RoomID(roomId), resp.RoomID)
 	// fmt.Printf("Expected userID: %v, got: %v\n", client.UserID, resp.ToUserID)
@@ -87,7 +76,6 @@ func (bot Bots) Linked(
 	client *mautrix.Client,
 	roomId string,
 	deviceId string,
-	botChan chan *event.Event,
 ) (bool, error) {
 	/*
 	* `89811738-f1ec-4793-abe5-0f7ea3794685` (+237690663592) - `CONNECTED`
@@ -105,23 +93,5 @@ func (bot Bots) Linked(
 		panic(err)
 	}
 
-	for {
-		resp := <-botChan
-		if resp.RoomID == id.RoomID(roomId) {
-			fmt.Printf("Bot channel parsing %v, %v\n", resp.Sender, resp.RoomID)
-			content := resp.Content.Raw
-
-			// for key, value := range contents {
-			// 	fmt.Printf("\t%s: %v\n", key, value)
-			// }
-			// fmt.Printf(">> %v -> %s", contents, contents["msgtype"])
-
-			// TODO: figure out how to get the device pairing out back to the users
-			if content["msgtype"] == "m.notice" {
-				body := content["body"].(string)
-				if strings.Contains(body, deviceId) && strings.Contains(body, `CONNECTED`) {
-				}
-			}
-		}
-	}
+	return true, nil
 }

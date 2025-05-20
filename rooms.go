@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -12,34 +13,43 @@ import (
 )
 
 type Room struct {
-	id id.RoomID
+	id      id.RoomID
+	channel chan *event.Event
 }
 
 func (r *Room) ListenJoinedRooms(
 	client *mautrix.Client,
-	roomChannel chan *event.Event,
 ) {
 	fmt.Println(">> Begin listening...")
-	joinedRooms, err := r.JoinedRooms(client, roomChannel)
+	joinedRooms, err := r.JoinedRooms(client)
 	fmt.Printf("[+] Joined rooms: %v\n", joinedRooms)
 
 	if err != nil {
 		log.Fatalf("Failed to fetche rooms: %v", err)
 	}
 
-	for _, r := range joinedRooms {
+	var wg sync.WaitGroup
+	for _, roomId := range joinedRooms {
+		wg.Add(1)
 		var room = Room{
-			id: id.RoomID(r),
+			id:      id.RoomID(roomId),
+			channel: r.channel,
 		}
 		go func() {
-			room.GetRoomMessages(client, roomChannel)
+			room.GetRoomMessages(client)
+			defer wg.Done()
+		}()
+		go func() {
+			room.GetInvites(client)
+			defer wg.Done()
 		}()
 	}
+	wg.Wait()
+	log.Println("Finished listening to rooms...")
 }
 
 func (r *Room) JoinedRooms(
 	client *mautrix.Client,
-	roomChannel chan *event.Event,
 ) ([]id.RoomID, error) {
 	resp, err := client.JoinedRooms(context.Background())
 
@@ -52,14 +62,13 @@ func (r *Room) JoinedRooms(
 
 func (r *Room) GetRoomMessages(
 	client *mautrix.Client,
-	roomChan chan *event.Event,
 ) {
 	fmt.Println("[+] Getting messages for: ", r.id)
 	for {
-		resp := <-roomChan
-		if resp.RoomID == id.RoomID(r.id) {
-			fmt.Printf("Room channel parsing %v, %v\n", resp.Sender, resp.RoomID)
-			content := resp.Content.Raw
+		evt := <-r.channel
+		if evt.Type == event.EventMessage {
+			fmt.Printf("Room channel parsing %v, %v\n", evt.Sender, evt.RoomID)
+			content := evt.Content.Raw
 
 			switch content["msgtype"] {
 			case "m.text":
@@ -96,6 +105,20 @@ func (r *Room) CreateRoom(
 		return "", err
 	}
 
-	r.id = resp.RoomID
 	return resp.RoomID, nil
+}
+
+func (r *Room) GetInvites(
+	client *mautrix.Client,
+) {
+	fmt.Println("[+] Getting invites for: ", r.id)
+	for {
+		resp := <-r.channel
+
+		if resp.Content.AsMember().Membership == event.MembershipInvite {
+			if resp.StateKey != nil && *resp.StateKey == client.UserID.String() {
+				fmt.Printf("Got invite to room: %s from %s\n", resp.RoomID, resp.Sender)
+			}
+		}
+	}
 }

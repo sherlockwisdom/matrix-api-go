@@ -123,30 +123,29 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 	return resp.AccessToken, nil
 }
 
-func Sync(client *mautrix.Client, botChan chan *event.Event) {
+func Sync(
+	client *mautrix.Client,
+	room *Room,
+	bot *Bots,
+) error {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		if evt.Type == event.EventMessage {
-			// log.Printf(
-			// 	"Event: %s | Room: %s | From: %s | Content: %s\n",
-			// 	evt.Type, evt.RoomID, evt.Sender, evt.Content.Parsed,
-			// )
-			botChan <- evt
-			return
-		}
+		log.Println("[+] New message type: ", evt.Type)
+		go func() {
+			room.channel <- evt
+		}()
 
-		// fmt.Printf(
-		// 	"Event: %s | Room: %s | From: %s\n",
-		// 	evt.Type, evt.RoomID, evt.Sender,
-		// )
+		go func() {
+			bot.channel <- evt
+		}()
 	})
 
-	go func() {
-		if err := client.Sync(); err != nil {
-			panic(err)
-		}
-	}()
+	log.Println("Syncing...")
+	if err := client.Sync(); err != nil {
+		return err
+	}
 
+	return nil
 }
