@@ -61,7 +61,7 @@ func LoginProcess(
 }
 
 func main() {
-	password := ".sh@221Bbs"
+	password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
 	homeServer := "https://relaysms.me"
 
 	client, err := mautrix.NewClient(homeServer, "", "")
@@ -105,12 +105,6 @@ func main() {
 
 	Sync(client, botChannel)
 	room.ListenJoinedRooms(client, roomChannel)
-
-	if err != nil {
-		log.Fatalf("Failed to fetched joined rooms %v", err)
-	}
-
-	// roomId := "!lqTEAwpbUhXqEsfGzL:relaysms.me"
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
