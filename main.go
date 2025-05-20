@@ -69,11 +69,10 @@ func main() {
 		panic(err)
 	}
 
+	var bot Bots
 	var room = Room{
 		channel: make(chan *event.Event),
-	}
-	var bot = Bots{
-		channel: make(chan *event.Event),
+		bot:     bot,
 	}
 
 	if len(os.Args) > 1 {
@@ -110,7 +109,7 @@ func main() {
 	}()
 
 	go func() {
-		err := Sync(client, &room, &bot)
+		err := Sync(client, &room)
 		if err != nil {
 			panic(err)
 		}
@@ -120,5 +119,6 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	<-sigChan
+	client.StopSync()
 	fmt.Println("\nShutdown signal received. Exiting...")
 }

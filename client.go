@@ -126,7 +126,6 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 func Sync(
 	client *mautrix.Client,
 	room *Room,
-	bot *Bots,
 ) error {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
@@ -135,10 +134,6 @@ func Sync(
 		log.Println("[+] New message type: ", evt.Type)
 		go func() {
 			room.channel <- evt
-		}()
-
-		go func() {
-			bot.channel <- evt
 		}()
 	})
 
