@@ -73,11 +73,12 @@ func (r *Rooms) ListenJoinedRooms(
 			room.GetRoomMessages(client)
 			defer wg.Done()
 		}()
-		go func() {
-			room.GetInvites(client)
-			defer wg.Done()
-		}()
 	}
+
+	go func() {
+		r.GetInvites(client)
+	}()
+
 	wg.Wait()
 	log.Println("[-] Finished listening to rooms...")
 }
