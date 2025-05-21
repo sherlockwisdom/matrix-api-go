@@ -57,7 +57,7 @@ func (clientDb *ClientDB) Store(accessToken string) error {
 	}
 
 	defer stmt.Close()
-	fmt.Println("- Storing for username: ", clientDb.username, ", AT: "+accessToken)
+	log.Println("[+] Storing for username:", clientDb.username, ", AT:", accessToken)
 
 	_, err = stmt.Exec(clientDb.username, accessToken)
 	if err != nil {
@@ -129,7 +129,6 @@ func (clientDb *ClientDB) StoreRooms(
 }
 
 func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
-	log.Println("- Fetching rooms for roomID:", roomID)
 	stmt, err := clientDb.connection.Prepare(
 		"select clientUsername, roomID, members, type, isBridge from rooms where roomID = ?",
 	)

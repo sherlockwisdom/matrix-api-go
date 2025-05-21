@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"maunium.net/go/mautrix"
@@ -27,13 +26,10 @@ func (bridge *Bridges) HandleMessage(evt *event.Event) (bool, error) {
 	// check template
 
 	if evt.Type == event.EventMessage {
-		log.Printf("%v", evt.RoomID)
-
 		var clientDB ClientDB = ClientDB{
 			username: bridge.username,
 			filepath: "db/" + bridge.username + ".db",
 		}
-		fmt.Println(clientDB)
 
 		clientDB.Init()
 		defer clientDB.Close()
