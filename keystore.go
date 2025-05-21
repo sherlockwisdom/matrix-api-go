@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 
 	_ "github.com/mattn/go-sqlite3"
 	"maunium.net/go/mautrix/event"
@@ -99,6 +100,7 @@ func (clientDb *ClientDB) StoreRooms(
 	_type int,
 	isBridge bool,
 ) error {
+	log.Println("[+] Storing to rooms:", roomID)
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err
@@ -127,25 +129,30 @@ func (clientDb *ClientDB) StoreRooms(
 }
 
 func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
-	fmt.Println("- Fetching rooms for username:", clientDb.filepath)
+	log.Println("- Fetching rooms for roomID:", roomID)
 	stmt, err := clientDb.connection.Prepare(
-		"select roomID, type, isBridge from rooms where roomID = ?",
+		"select clientUsername, roomID, members, type, isBridge from rooms where roomID = ?",
 	)
 	if err != nil {
 		return Rooms{}, err
 	}
+	var clientUsername string
+	var _roomID string
+	var members string
 	var _type int
 	var isBridge bool
 
 	defer stmt.Close()
 
-	err = stmt.QueryRow(roomID).Scan(&roomID, _type, isBridge)
+	fmt.Println(stmt)
+
+	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &members, &_type, &isBridge)
 	if err != nil {
 		panic(err)
 	}
 
 	var room = Rooms{
-		ID:       id.RoomID(roomID),
+		ID:       id.RoomID(_roomID),
 		Channel:  make(chan *event.Event),
 		Type:     RoomType{_type},
 		isBridge: isBridge,

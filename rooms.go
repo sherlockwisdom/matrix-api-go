@@ -67,7 +67,7 @@ func (r *Rooms) ListenJoinedRooms(
 		var room = Rooms{
 			ID:      id.RoomID(roomId),
 			Channel: r.Channel,
-			Bridge:  Bridges{client.UserID.String()},
+			Bridge:  Bridges{r.Bridge.username},
 		}
 		go func() {
 			room.GetRoomMessages(client)
@@ -153,7 +153,11 @@ func (r *Rooms) CreateRoom(
 	r.ID = resp.RoomID
 	r.Type = _type
 
-	var clientDB = ClientDB{username: client.UserID.String()}
+	var clientDB ClientDB = ClientDB{
+		username: r.Bridge.username,
+		filepath: "db/" + r.Bridge.username + ".db",
+	}
+	fmt.Println(clientDB)
 
 	clientDB.Init()
 	if err := clientDB.StoreRooms(

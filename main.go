@@ -39,6 +39,7 @@ func CreateProcess(
 	println("[+] Created user: ", username)
 
 	members := "@signalbot:relaysms.me"
+	room.Bridge.username = username
 	_, err = room.CreateRoom(client, members, roomTypes.Management, true)
 	if err != nil {
 		log.Fatalf("[-] Failed to create room: %v", err)
@@ -59,6 +60,7 @@ func LoginProcess(
 		Login(client, username, password)
 	}
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
+	room.Bridge.username = username
 }
 
 func main() {
@@ -70,10 +72,10 @@ func main() {
 		panic(err)
 	}
 
-	var bot Bridges
+	var bridge Bridges
 	var room = Rooms{
 		Channel: make(chan *event.Event),
-		Bridge:  bot,
+		Bridge:  bridge,
 	}
 
 	if len(os.Args) > 1 {
