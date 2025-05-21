@@ -35,7 +35,6 @@ func CreateProcess(
 	room.Bridge.username = username
 	_, err = room.CreateRoom(client, members, roomTypes.Management, true)
 	if err != nil {
-		log.Fatalf("[-] Failed to create room: %v", err)
 		return err
 	}
 
@@ -50,13 +49,17 @@ func LoginProcess(
 	room *Rooms,
 	username string,
 	password string,
-) {
-	_, err := LoadActiveSessions(client, username)
+) error {
+	_, err := LoadActiveSessions(client, username, password)
 	if err != nil {
-		Login(client, username, password)
+		if _, err = Login(client, username, password); err != nil {
+			return err
+		}
 	}
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
 	room.Bridge.username = username
+
+	return nil
 }
 
 // func main() {

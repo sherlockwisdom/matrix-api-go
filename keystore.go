@@ -24,6 +24,7 @@ func (clientDb *ClientDB) Init() error {
 	CREATE TABLE IF NOT EXISTS clients ( 
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
 	username TEXT NOT NULL, 
+	password TEXT NOT NULL,
 	accessToken TEXT NOT NULL, 
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -45,13 +46,31 @@ func (clientDb *ClientDB) Init() error {
 	return err
 }
 
-func (clientDb *ClientDB) Store(accessToken string) error {
+func (clientDb *ClientDB) Authenticate(username string, password string) (bool, error) {
+	query := `SELECT COUNT(*) FROM clients WHERE username = ? AND password = ?`
+
+	var count int
+	err := clientDb.connection.QueryRow(query, username, password).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("authentication query failed: %w", err)
+	}
+
+	if count == 0 {
+		log.Printf("[-] Authentication failed for user: %s", username)
+		return false, nil
+	}
+
+	log.Printf("[+] Authentication successful for user: %s", username)
+	return true, nil
+}
+
+func (clientDb *ClientDB) Store(accessToken string, password string) error {
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT INTO clients (username, accessToken) values(?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO clients (username, accessToken, password) values(?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -59,7 +78,7 @@ func (clientDb *ClientDB) Store(accessToken string) error {
 	defer stmt.Close()
 	log.Println("[+] Storing for username:", clientDb.username, ", AT:", accessToken)
 
-	_, err = stmt.Exec(clientDb.username, accessToken)
+	_, err = stmt.Exec(clientDb.username, accessToken, password)
 	if err != nil {
 		return err
 	}

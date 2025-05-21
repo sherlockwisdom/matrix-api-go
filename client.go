@@ -19,6 +19,7 @@ type ClientDB struct {
 func LoadActiveSessions(
 	client *mautrix.Client,
 	username string,
+	password string,
 ) (string, error) {
 	fmt.Println("Loading active sessions: ", username)
 
@@ -27,6 +28,16 @@ func LoadActiveSessions(
 		filepath: "db/" + username + ".db",
 	}
 	clientDB.Init()
+	exists, err := clientDB.Authenticate(username, password)
+
+	if err != nil {
+		return "", err
+	}
+
+	if !exists {
+		return "", fmt.Errorf("user does not exist")
+	}
+
 	accessToken, err := clientDB.Fetch()
 	if err != nil {
 		panic(err)
@@ -39,7 +50,7 @@ func LoadActiveSessions(
 	return accessToken, nil
 }
 
-func Login(client *mautrix.Client, username string, password string) {
+func Login(client *mautrix.Client, username string, password string) (string, error) {
 	fmt.Printf("Login in as %s\n", username)
 
 	var clientDB ClientDB = ClientDB{
@@ -61,19 +72,18 @@ func Login(client *mautrix.Client, username string, password string) {
 		Password:   password,
 	})
 	if err != nil {
-		log.Fatalf("Login failed: %v", err)
+		return "", err
 	}
+
 	client.AccessToken = resp.AccessToken
 
-	err = clientDB.Store(client.AccessToken)
+	err = clientDB.Store(client.AccessToken, password)
 
 	if err != nil {
-		log.Fatalf("Failed to store in db: %v", err)
+		return "", err
 	}
 
-	if err != nil {
-		panic(err)
-	}
+	return resp.AccessToken, nil
 }
 
 func Logout(client *mautrix.Client) error {
@@ -121,7 +131,7 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 	client.AccessToken = resp.AccessToken
 
 	clientDB.Init()
-	err = clientDB.Store(client.AccessToken)
+	err = clientDB.Store(client.AccessToken, password)
 	if err != nil {
 		panic(err)
 	}
