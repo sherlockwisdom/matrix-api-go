@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"maunium.net/go/mautrix"
@@ -104,6 +107,37 @@ func ApiSendMessage(c *gin.Context) {
 }
 
 func main() {
+	if len(os.Args) > 1 {
+		password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
+		homeServer := "https://relaysms.me"
+
+		client, err := mautrix.NewClient(homeServer, "", "")
+		if err != nil {
+			panic(err)
+		}
+
+		var bridge Bridges
+		var room = Rooms{
+			Channel: make(chan *event.Event),
+			Bridge:  bridge,
+		}
+		switch os.Args[1] {
+		case "--create":
+			username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+			CreateProcess(
+				client,
+				&room,
+				username,
+				password,
+			)
+		case "--login":
+			username := os.Args[2]
+			LoginProcess(client, &room, username, password)
+		default:
+		}
+		CompleteRun(client, &room)
+	}
+
 	router := gin.Default()
 	router.POST("/create", ApiCreate)
 	router.POST("/login", ApiCreate)

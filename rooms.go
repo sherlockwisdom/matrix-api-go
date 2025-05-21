@@ -62,10 +62,10 @@ func (r *Rooms) ListenJoinedRooms(
 	}
 
 	var wg sync.WaitGroup
-	for _, roomId := range joinedRooms {
+	listenInRoom := func(roomId id.RoomID) {
 		wg.Add(1)
 		var room = Rooms{
-			ID:      id.RoomID(roomId),
+			ID:      roomId,
 			Channel: r.Channel,
 			Bridge:  Bridges{r.Bridge.username},
 		}
@@ -74,6 +74,28 @@ func (r *Rooms) ListenJoinedRooms(
 			defer wg.Done()
 		}()
 	}
+
+	for _, roomId := range joinedRooms {
+		listenInRoom(roomId)
+	}
+
+	go func() {
+		for {
+			evt := <-r.Channel
+			if evt.Type == event.EventMessage {
+				listeningInRoom := false
+				for _, roomId := range joinedRooms {
+					if roomId == evt.RoomID {
+						listeningInRoom = true
+					}
+				}
+
+				if !listeningInRoom {
+					listenInRoom(evt.RoomID)
+				}
+			}
+		}
+	}()
 
 	go func() {
 		r.GetInvites(client)

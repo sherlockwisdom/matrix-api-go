@@ -104,7 +104,10 @@ func (clientDb *ClientDB) Fetch() (string, error) {
 
 	err = stmt.QueryRow(clientDb.username).Scan(&accessToken)
 	if err != nil {
-		panic(err)
+		if err == sql.ErrNoRows {
+			return accessToken, nil
+		}
+		return accessToken, err
 	}
 	return accessToken, err
 }
@@ -166,7 +169,10 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 
 	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &members, &_type, &isBridge)
 	if err != nil {
-		panic(err)
+		if err == sql.ErrNoRows {
+			return Rooms{}, nil
+		}
+		return Rooms{}, err
 	}
 
 	var room = Rooms{

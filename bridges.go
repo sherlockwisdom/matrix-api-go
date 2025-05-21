@@ -37,7 +37,7 @@ func (bridge *Bridges) HandleMessage(evt *event.Event) (bool, error) {
 		room, err := clientDB.FetchRooms(evt.RoomID.String())
 
 		if err != nil {
-			panic(err)
+			return false, err
 		}
 
 		if !room.isBridge {
