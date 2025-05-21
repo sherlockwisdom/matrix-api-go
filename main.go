@@ -26,7 +26,7 @@ import (
 
 func CreateProcess(
 	client *mautrix.Client,
-	room *Room,
+	room *Rooms,
 	username string,
 	password string,
 ) {
@@ -38,7 +38,8 @@ func CreateProcess(
 
 	println("[+] Created user: ", username)
 
-	_, err = room.CreateRoom(client, "@signalbot:relaysms.me")
+	members := "@signalbot:relaysms.me"
+	_, err = room.CreateRoom(client, members, roomTypes.Management, true)
 	if err != nil {
 		log.Fatalf("[-] Failed to create room: %v", err)
 	}
@@ -49,7 +50,7 @@ func CreateProcess(
 
 func LoginProcess(
 	client *mautrix.Client,
-	room *Room,
+	room *Rooms,
 	username string,
 	password string,
 ) {
@@ -69,10 +70,10 @@ func main() {
 		panic(err)
 	}
 
-	var bot Bots
-	var room = Room{
-		channel: make(chan *event.Event),
-		bot:     bot,
+	var bot Bridges
+	var room = Rooms{
+		Channel: make(chan *event.Event),
+		Bridge:  bot,
 	}
 
 	if len(os.Args) > 1 {

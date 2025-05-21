@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -11,16 +12,48 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-type Room struct {
-	id      id.RoomID
-	channel chan *event.Event
-	bot     Bots
+var roomTypes = NewRoomTypesRegistry()
+
+func NewRoomTypesRegistry() *RoomTypes {
+	management := RoomType{0}
+
+	return &RoomTypes{
+		Management: management,
+		types:      []*RoomType{&management},
+	}
 }
 
-func (r *Room) ListenJoinedRooms(
+func (r *RoomType) Parse() int {
+	for _, roomType := range roomTypes.types {
+		if roomType == r {
+			return roomType.IntValue
+		}
+	}
+	return -1
+}
+
+type RoomTypes struct {
+	Management RoomType
+
+	types []*RoomType
+}
+
+type RoomType struct {
+	IntValue int
+}
+
+type Rooms struct {
+	ID       id.RoomID
+	Channel  chan *event.Event
+	Bridge   Bridges
+	Type     RoomType
+	isBridge bool
+}
+
+func (r *Rooms) ListenJoinedRooms(
 	client *mautrix.Client,
 ) {
-	log.Println(">> Begin listening...")
+	log.Println(">> Begin listening...", client.UserID.String())
 	joinedRooms, err := r.JoinedRooms(client)
 	log.Printf("[+] Joined rooms: %v\n", joinedRooms)
 
@@ -31,9 +64,10 @@ func (r *Room) ListenJoinedRooms(
 	var wg sync.WaitGroup
 	for _, roomId := range joinedRooms {
 		wg.Add(1)
-		var room = Room{
-			id:      id.RoomID(roomId),
-			channel: r.channel,
+		var room = Rooms{
+			ID:      id.RoomID(roomId),
+			Channel: r.Channel,
+			Bridge:  Bridges{client.UserID.String()},
 		}
 		go func() {
 			room.GetRoomMessages(client)
@@ -48,7 +82,7 @@ func (r *Room) ListenJoinedRooms(
 	log.Println("[-] Finished listening to rooms...")
 }
 
-func (r *Room) JoinedRooms(
+func (r *Rooms) JoinedRooms(
 	client *mautrix.Client,
 ) ([]id.RoomID, error) {
 	resp, err := client.JoinedRooms(context.Background())
@@ -60,17 +94,17 @@ func (r *Room) JoinedRooms(
 	return resp.JoinedRooms, err
 }
 
-func (r *Room) GetRoomMessages(
+func (r *Rooms) GetRoomMessages(
 	client *mautrix.Client,
 ) {
-	log.Println("[+] Getting messages for: ", r.id)
+	log.Println("[+] Getting messages for: ", r.ID)
 	for {
-		evt := <-r.channel
+		evt := <-r.Channel
 		if evt.Type == event.EventMessage {
 			log.Printf("[*] Room channel parsing %v, %v\n", evt.Sender, evt.RoomID)
 			content := evt.Content.Raw
 
-			if isBot, _ := r.bot.HandleMessage(evt); isBot {
+			if isHandled, _ := r.Bridge.HandleMessage(evt); isHandled {
 				return
 			}
 
@@ -98,12 +132,14 @@ func (r *Room) GetRoomMessages(
 	}
 }
 
-func (r *Room) CreateRoom(
+func (r *Rooms) CreateRoom(
 	client *mautrix.Client,
-	recipient string,
+	members string,
+	_type RoomType,
+	isBridge bool,
 ) (id.RoomID, error) {
 	resp, err := client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
-		Invite:   []id.UserID{id.UserID(recipient)},
+		Invite:   []id.UserID{id.UserID(members)},
 		IsDirect: true,
 		// Preset:     "private_chat",
 		Preset:     "trusted_private_chat",
@@ -114,15 +150,30 @@ func (r *Room) CreateRoom(
 		return "", err
 	}
 
+	r.ID = resp.RoomID
+	r.Type = _type
+
+	var clientDB = ClientDB{username: client.UserID.String()}
+
+	clientDB.Init()
+	if err := clientDB.StoreRooms(
+		r.ID.String(),
+		members,
+		_type.Parse(),
+		isBridge,
+	); err != nil {
+		panic(err)
+	}
+
 	return resp.RoomID, nil
 }
 
-func (r *Room) GetInvites(
+func (r *Rooms) GetInvites(
 	client *mautrix.Client,
 ) {
-	log.Println("[+] Getting invites for: ", r.id)
+	log.Println("[+] Getting invites for: ", r.ID)
 	for {
-		evt := <-r.channel
+		evt := <-r.Channel
 
 		if evt.Content.AsMember().Membership == event.MembershipInvite {
 			if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
@@ -136,11 +187,20 @@ func (r *Room) GetInvites(
 	}
 }
 
-func (r *Room) Join(
+func (r *Rooms) Join(
 	client *mautrix.Client,
 	roomId id.RoomID,
 ) error {
 	log.Println("[*] Joining room:", roomId)
 	_, err := client.JoinRoomByID(context.Background(), roomId)
 	return err
+}
+
+func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
+	fmt.Printf(">>\tParsing image for: %v\n", url)
+	contentUrl, err := id.ParseContentURI(url)
+	if err != nil {
+		panic(err)
+	}
+	return client.DownloadBytes(context.Background(), contentUrl)
 }

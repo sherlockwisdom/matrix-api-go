@@ -2,12 +2,19 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 )
+
+type ClientDB struct {
+	connection *sql.DB
+	username   string
+	filepath   string
+}
 
 func LoadActiveSessions(
 	client *mautrix.Client,
@@ -125,7 +132,7 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 
 func Sync(
 	client *mautrix.Client,
-	room *Room,
+	room *Rooms,
 ) error {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
@@ -133,7 +140,7 @@ func Sync(
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
 		log.Println("[+] New message type: ", evt.Type)
 		go func() {
-			room.channel <- evt
+			room.Channel <- evt
 		}()
 	})
 

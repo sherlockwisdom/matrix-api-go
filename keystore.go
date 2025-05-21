@@ -5,22 +5,11 @@ import (
 	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
+	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
 
 // https://github.com/mattn/go-sqlite3/blob/v1.14.28/_example/simple/simple.go
-
-type ClientDBInterface interface {
-	Init() error
-	Close() error
-	Fetch() (string, error)
-	Store(string) error
-}
-
-type ClientDB struct {
-	connection *sql.DB
-	username   string
-	filepath   string
-}
 
 func (clientDb *ClientDB) Init() error {
 	db, err := sql.Open("sqlite3", clientDb.filepath)
@@ -38,12 +27,15 @@ func (clientDb *ClientDB) Init() error {
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	// CREATE CLIENT_BRIDGES IF NOT EXISTS clients ( 
-	// id INTEGER PRIMARY KEY AUTOINCREMENT, 
-	// username TEXT NOT NULL, 
-	// accessToken BLOB NOT NULL, 
-	// timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-	// );
+	CREATE TABLE IF NOT EXISTS rooms ( 
+	id INTEGER PRIMARY KEY AUTOINCREMENT, 
+	clientUsername TEXT NOT NULL,
+	roomID TEXT NOT NULL,
+	members TEXT NOT NULL,
+	type INTEGER NOT NULL,
+	isBridge INTEGER NOT NULL,
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`)
 
 	if err != nil {
@@ -99,4 +91,65 @@ func (clientDb *ClientDB) Fetch() (string, error) {
 
 func (clientDb *ClientDB) Close() {
 	defer clientDb.connection.Close()
+}
+
+func (clientDb *ClientDB) StoreRooms(
+	roomID string,
+	members string,
+	_type int,
+	isBridge bool,
+) error {
+	tx, err := clientDb.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO rooms (clientUsername, roomID, members, type, isBridge) values(?,?,?,?,?)`,
+	)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(clientDb.username, roomID, members, _type, isBridge)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
+	fmt.Println("- Fetching rooms for username:", clientDb.filepath)
+	stmt, err := clientDb.connection.Prepare(
+		"select roomID, type, isBridge from rooms where roomID = ?",
+	)
+	if err != nil {
+		return Rooms{}, err
+	}
+	var _type int
+	var isBridge bool
+
+	defer stmt.Close()
+
+	err = stmt.QueryRow(roomID).Scan(&roomID, _type, isBridge)
+	if err != nil {
+		panic(err)
+	}
+
+	var room = Rooms{
+		ID:       id.RoomID(roomID),
+		Channel:  make(chan *event.Event),
+		Type:     RoomType{_type},
+		isBridge: isBridge,
+	}
+
+	return room, err
 }
