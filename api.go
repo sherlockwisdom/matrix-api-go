@@ -141,6 +141,7 @@ func main() {
 	router := gin.Default()
 	router.POST("/create", ApiCreate)
 	router.POST("/login", ApiCreate)
+	router.POST("/:platform/message/:roomid", ApiCreate)
 
 	router.Run("localhost:8080")
 }
