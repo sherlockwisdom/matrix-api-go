@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"maunium.net/go/mautrix"
@@ -91,6 +93,41 @@ func CompleteRun(
 		if err != nil {
 			panic(err)
 		}
+	}()
+
+	messagingRoomId := ""
+	reader := bufio.NewReader(os.Stdin)
+
+	go func() {
+		for {
+			fmt.Printf("[%s]-> ", messagingRoomId)
+			text, _ := reader.ReadString('\n')
+
+			if text == "" || text == "\n" {
+				continue
+			}
+
+			if strings.Contains(text, ">room") {
+				st := strings.Split(text, " ")
+				messagingRoomId = st[len(st)-1]
+				continue
+			}
+
+			if messagingRoomId == "" {
+				fmt.Println("** Messaging requires a room")
+				continue
+			}
+
+			room := Rooms{
+				ID: id.RoomID(messagingRoomId),
+			}
+
+			_, err := room.SendRoomMessages(client, text)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+		}
+
 	}()
 
 	sigChan := make(chan os.Signal, 1)

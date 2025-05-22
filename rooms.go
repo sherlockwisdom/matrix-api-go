@@ -143,12 +143,26 @@ type User struct {
 	MxID        id.UserID
 }
 
+func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (string, error) {
+	log.Printf("[+] Sending message: %s to %v\n", message, r.ID)
+
+	resp, err := client.SendText(
+		context.Background(),
+		id.RoomID(r.ID),
+		message,
+	)
+
+	if err != nil {
+		return "", err
+	}
+	return resp.EventID.String(), err
+}
+
 func (r *Rooms) GetRoomMessages(
 	client *mautrix.Client,
 ) {
 	log.Println("[+] Getting messages for: ", r.ID)
-	for {
-		evt := <-r.Channel
+	for evt := range r.Channel {
 		if evt.Type == event.EventMessage && r.ID == evt.RoomID {
 
 			userProfile, _ := client.GetProfile(context.Background(), evt.Sender)
@@ -166,7 +180,7 @@ func (r *Rooms) GetRoomMessages(
 
 			switch content["msgtype"] {
 			case "m.text":
-				log.Println("[+] MSG:", content["body"].(string))
+				log.Println("[+] MSG:", content["body"].(string), r.ID)
 			case "m.image":
 				rawImage, err := ParseImage(client, content["url"].(string))
 				if err != nil {
