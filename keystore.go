@@ -165,8 +165,6 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 
 	defer stmt.Close()
 
-	fmt.Println(stmt)
-
 	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &members, &_type, &isBridge)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -118,7 +118,7 @@ func main() {
 
 		var bridge Bridges
 		var room = Rooms{
-			Channel: make(chan *event.Event),
+			Channel: make(chan *event.Event, 500),
 			Bridge:  bridge,
 		}
 		switch os.Args[1] {

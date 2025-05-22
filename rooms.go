@@ -61,45 +61,66 @@ func (r *Rooms) ListenJoinedRooms(
 		log.Fatalf("[-] Failed to fetch rooms: %v", err)
 	}
 
+	// map RoomID -> room channel
+	var roomChannels = make(map[id.RoomID]chan *event.Event)
+
+	chanBufferSize := 500 //TODO: move to a config file
+
 	var wg sync.WaitGroup
-	listenInRoom := func(roomId id.RoomID) {
-		wg.Add(1)
-		var room = Rooms{
+	for _, roomId := range joinedRooms {
+		channel := make(chan *event.Event, chanBufferSize)
+		roomChannels[roomId] = channel
+
+		room := Rooms{
 			ID:      roomId,
-			Channel: r.Channel,
+			Channel: channel,
 			Bridge:  Bridges{r.Bridge.username},
 		}
-		go func() {
-			room.GetRoomMessages(client)
-			defer wg.Done()
-		}()
-	}
 
-	for _, roomId := range joinedRooms {
-		listenInRoom(roomId)
+		wg.Add(1)
+		go func(rm Rooms) {
+			defer wg.Done()
+			rm.GetRoomMessages(client)
+		}(room)
 	}
 
 	go func() {
-		for {
-			evt := <-r.Channel
-			if evt.Type == event.EventMessage {
-				listeningInRoom := false
-				for _, roomId := range joinedRooms {
-					if roomId == evt.RoomID {
-						listeningInRoom = true
-					}
+		for evt := range r.Channel {
+			// evt := <-r.Channel
+			// log.Println("[*] Dispatching event to room:", evt.RoomID)
+
+			ch, exists := roomChannels[evt.RoomID]
+			if !exists {
+				// New room? Start listening dynamically
+				channel := make(chan *event.Event, chanBufferSize)
+				roomChannels[evt.RoomID] = channel
+
+				newRoom := Rooms{
+					ID:      evt.RoomID,
+					Channel: channel,
+					Bridge:  Bridges{r.Bridge.username},
 				}
 
-				if !listeningInRoom {
-					listenInRoom(evt.RoomID)
-				}
+				wg.Add(1)
+				go func(rm Rooms) {
+					defer wg.Done()
+					rm.GetRoomMessages(client)
+				}(newRoom)
+				ch = channel
+			}
+
+			// Send event (non-blocking safe send)
+			select {
+			case ch <- evt:
+			default:
+				log.Printf("[-] Dropping event: channel for %v is full", evt.RoomID)
 			}
 		}
 	}()
 
-	go func() {
-		r.GetInvites(client)
-	}()
+	// go func() {
+	// 	r.GetInvites(client)
+	// }()
 
 	wg.Wait()
 	log.Println("[-] Finished listening to rooms...")
@@ -117,14 +138,26 @@ func (r *Rooms) JoinedRooms(
 	return resp.JoinedRooms, err
 }
 
+type User struct {
+	DisplayName string
+	MxID        id.UserID
+}
+
 func (r *Rooms) GetRoomMessages(
 	client *mautrix.Client,
 ) {
 	log.Println("[+] Getting messages for: ", r.ID)
 	for {
 		evt := <-r.Channel
-		if evt.Type == event.EventMessage {
-			log.Printf("[*] Room channel parsing %v, %v\n", evt.Sender, evt.RoomID)
+		if evt.Type == event.EventMessage && r.ID == evt.RoomID {
+
+			userProfile, _ := client.GetProfile(context.Background(), evt.Sender)
+			user := User{
+				DisplayName: userProfile.DisplayName,
+				MxID:        evt.Sender,
+			}
+			fmt.Println(user)
+
 			content := evt.Content.Raw
 
 			if isHandled, _ := r.Bridge.HandleMessage(evt); isHandled {
@@ -135,7 +168,6 @@ func (r *Rooms) GetRoomMessages(
 			case "m.text":
 				log.Println("[+] MSG:", content["body"].(string))
 			case "m.image":
-				log.Println("[+] saving image", evt.Content.Raw)
 				rawImage, err := ParseImage(client, content["url"].(string))
 				if err != nil {
 					panic(err)
@@ -193,25 +225,6 @@ func (r *Rooms) CreateRoom(
 	}
 
 	return resp.RoomID, nil
-}
-
-func (r *Rooms) GetInvites(
-	client *mautrix.Client,
-) {
-	log.Println("[+] Getting invites for: ", r.ID)
-	for {
-		evt := <-r.Channel
-
-		if evt.Content.AsMember().Membership == event.MembershipInvite {
-			if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
-				log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
-				err := r.Join(client, evt.RoomID)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-	}
 }
 
 func (r *Rooms) Join(

@@ -44,7 +44,8 @@ func (bridge *Bridges) HandleMessage(evt *event.Event) (bool, error) {
 			return false, nil
 		}
 
-		log.Println("[+] BRIDGE| New message:", evt.Content.AsMessage().Body)
+		// log.Println("[+] BRIDGE| New message:", evt.Content.AsMessage().Body)
+		log.Println(evt.Content.Raw)
 		return true, nil
 	}
 	return false, nil

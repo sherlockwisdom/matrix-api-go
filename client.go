@@ -148,9 +148,10 @@ func Sync(
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		log.Println("[+] New message type: ", evt.Type)
+		// log.Println("[+] New message type: ", evt.Type)
 		go func() {
 			room.Channel <- evt
+			room.GetInvites(client, evt)
 		}()
 	})
 
@@ -160,4 +161,20 @@ func Sync(
 	}
 
 	return nil
+}
+
+func (r *Rooms) GetInvites(
+	client *mautrix.Client,
+	evt *event.Event,
+) {
+	if evt.Content.AsMember().Membership == event.MembershipInvite {
+		log.Println("[+] Getting invites for: ", r.ID)
+		if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
+			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
+			err := r.Join(client, evt.RoomID)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 }
