@@ -107,6 +107,8 @@ func CompleteRun(
 				continue
 			}
 
+			text = strings.TrimSuffix(text, "\n")
+
 			if strings.Contains(text, ">room") {
 				st := strings.Split(text, " ")
 				messagingRoomId = st[len(st)-1]
@@ -122,10 +124,12 @@ func CompleteRun(
 				ID: id.RoomID(messagingRoomId),
 			}
 
-			_, err := room.SendRoomMessages(client, text)
+			resp, err := room.SendRoomMessages(client, text)
 			if err != nil {
 				fmt.Printf("%v\n", err)
 			}
+
+			fmt.Println(resp)
 		}
 
 	}()
