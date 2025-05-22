@@ -84,8 +84,33 @@ func CompleteRun(
 		}()
 	*/
 
+	callback := func(inMd IncomingMessageMetaData, err error) {
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		switch inMd.Message.Type {
+		case "m.text":
+			log.Printf(">> %s %v\n", inMd.Type, inMd)
+		case "m.image":
+			rawImage, err := ParseImage(client, string(inMd.Message.Content.AsMessage().URL))
+			if err != nil {
+				panic(err)
+			}
+
+			filename := inMd.Message.Content.AsMessage().FileName
+			if filename == "" {
+				filename = inMd.Message.Content.AsMessage().Body
+			}
+			imageDownloadFilepath := "downloads/rooms/" + filename
+			os.WriteFile(imageDownloadFilepath, rawImage, 0644)
+			log.Printf("[+] Saved image to room dir: %s\n", imageDownloadFilepath)
+		default:
+			log.Printf("[-] Type not yet implemented: %v\n", inMd.Message.Content.Raw["msgtype"])
+		}
+	}
 	go func() {
-		room.ListenJoinedRooms(client)
+		room.ListenJoinedRooms(client, callback)
 	}()
 
 	go func() {

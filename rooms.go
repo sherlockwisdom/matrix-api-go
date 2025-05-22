@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"maunium.net/go/mautrix"
@@ -52,6 +51,7 @@ type Rooms struct {
 
 func (r *Rooms) ListenJoinedRooms(
 	client *mautrix.Client,
+	callback IncomingMessageCallback,
 ) {
 	log.Println(">> Begin listening...", client.UserID.String())
 	joinedRooms, err := r.JoinedRooms(client)
@@ -80,7 +80,7 @@ func (r *Rooms) ListenJoinedRooms(
 		wg.Add(1)
 		go func(rm Rooms) {
 			defer wg.Done()
-			rm.GetRoomMessages(client)
+			rm.GetRoomMessages(client, callback)
 		}(room)
 	}
 
@@ -104,7 +104,7 @@ func (r *Rooms) ListenJoinedRooms(
 				wg.Add(1)
 				go func(rm Rooms) {
 					defer wg.Done()
-					rm.GetRoomMessages(client)
+					rm.GetRoomMessages(client, callback)
 				}(newRoom)
 				ch = channel
 			}
@@ -138,15 +138,18 @@ func (r *Rooms) JoinedRooms(
 	return resp.JoinedRooms, err
 }
 
-type User struct {
+type IncomingMessageMetaData struct {
 	DisplayName string
 	MxID        id.UserID
+	Type        string
+	Message     MessageMetaData
+	RoomID      id.RoomID
 }
 
-type MessageType struct {
-	Sending   string
-	Receiving string
-	Type      string
+type MessageMetaData struct {
+	Content   event.Content
+	Timestamp int64
+	Type      interface{}
 }
 
 func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (string, error) {
@@ -164,51 +167,42 @@ func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (string
 	return resp.EventID.String(), err
 }
 
+type IncomingMessageCallback func(IncomingMessageMetaData, error)
+
+var MessageTypeSending = "sending"
+var MessageTypeReceiving = "receiving"
+
 func (r *Rooms) GetRoomMessages(
 	client *mautrix.Client,
+	callback IncomingMessageCallback,
 ) {
 	log.Println("[+] Getting messages for: ", r.ID)
 	for evt := range r.Channel {
 		if evt.Type == event.EventMessage && r.ID == evt.RoomID {
 
 			userProfile, _ := client.GetProfile(context.Background(), evt.Sender)
-			user := User{
-				DisplayName: userProfile.DisplayName,
-				MxID:        evt.Sender,
-			}
-
-			content := evt.Content.Raw
 
 			if isHandled, _ := r.Bridge.HandleMessage(evt); isHandled {
 				return
 			}
 
-			fmt.Println(user)
-			_type := "receiving"
-
-			if user.MxID == client.UserID {
-				_type = "sending"
+			_type := MessageTypeReceiving
+			if evt.Sender == client.UserID {
+				_type = MessageTypeSending
 			}
 
-			switch content["msgtype"] {
-			case "m.text":
-				log.Printf("[+] %s msg: %s, %v\n", _type, content["body"].(string), r.ID)
-			case "m.image":
-				rawImage, err := ParseImage(client, content["url"].(string))
-				if err != nil {
-					panic(err)
-				}
-
-				filename := content["filename"]
-				if filename == nil {
-					filename = content["body"]
-				}
-				imageDownloadFilepath := "downloads/rooms/" + filename.(string)
-				os.WriteFile(imageDownloadFilepath, rawImage, 0644)
-				log.Printf("[+] Saved image to room dir: %s\n", imageDownloadFilepath)
-			default:
-				log.Printf("[-] Type not yet implemented: %v\n", content["msgtype"])
+			incomingMessageMetaData := IncomingMessageMetaData{
+				DisplayName: userProfile.DisplayName,
+				MxID:        evt.Sender,
+				Type:        _type,
+				Message: MessageMetaData{
+					Content:   evt.Content,
+					Timestamp: evt.Timestamp,
+					Type:      evt.Content.Raw["msgtype"],
+				},
 			}
+
+			go callback(incomingMessageMetaData, nil)
 		}
 	}
 }
