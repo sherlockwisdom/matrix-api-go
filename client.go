@@ -21,7 +21,7 @@ func LoadActiveSessions(
 	username string,
 	password string,
 ) (string, error) {
-	fmt.Println("Loading active sessions: ", username)
+	fmt.Println("Loading active sessions: ", username, password)
 
 	var clientDB ClientDB = ClientDB{
 		username: username,

@@ -19,7 +19,8 @@ type ClientJsonRequest struct {
 }
 
 type ClientMessageJsonRequeset struct {
-	Message string
+	AccessToken string `json:"access_token"`
+	Message     string `json:"message"`
 }
 
 func ApiLogin(c *gin.Context) {
@@ -129,7 +130,7 @@ func ApiSendMessage(c *gin.Context) {
 	}
 
 	homeServer := "https://relaysms.me"
-	client, err := mautrix.NewClient(homeServer, "", "")
+	client, err := mautrix.NewClient(homeServer, "", req.AccessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})

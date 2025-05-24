@@ -153,7 +153,7 @@ type MessageMetaData struct {
 }
 
 func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (*mautrix.RespSendEvent, error) {
-	log.Printf("[+] Sending message: %s to %v\n", message, r.ID)
+	log.Printf("[+] Sending message: %s to %v - %s\n", message, r.ID, client.AccessToken)
 
 	resp, err := client.SendText(
 		context.Background(),
