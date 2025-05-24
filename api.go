@@ -10,11 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
 
 type ClientJsonRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type ClientMessageJsonRequeset struct {
+	Message string
 }
 
 func ApiLogin(c *gin.Context) {
@@ -104,6 +109,50 @@ func ApiCreate(c *gin.Context) {
 }
 
 func ApiSendMessage(c *gin.Context) {
+	var req ClientMessageJsonRequeset
+	roomID := c.Param("roomid")
+
+	if roomID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing room ID"})
+		return
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		log.Printf("Invalid request payload: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON payload"})
+		return
+	}
+
+	if req.Message == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message body cannot be empty"})
+		return
+	}
+
+	homeServer := "https://relaysms.me"
+	client, err := mautrix.NewClient(homeServer, "", "")
+	if err != nil {
+		log.Printf("Failed to create Matrix client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
+		return
+	}
+
+	room := Rooms{
+		ID: id.RoomID(roomID),
+	}
+
+	resp, err := room.SendRoomMessages(client, req.Message)
+	if err != nil {
+		log.Printf("Failed to send message: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"room_id":  roomID,
+		"event_id": resp.EventID,
+		"message":  req.Message,
+		"status":   "sent",
+	})
 }
 
 func main() {

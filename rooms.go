@@ -152,7 +152,7 @@ type MessageMetaData struct {
 	Type      interface{}
 }
 
-func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (string, error) {
+func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (*mautrix.RespSendEvent, error) {
 	log.Printf("[+] Sending message: %s to %v\n", message, r.ID)
 
 	resp, err := client.SendText(
@@ -161,10 +161,7 @@ func (r *Rooms) SendRoomMessages(client *mautrix.Client, message string) (string
 		message,
 	)
 
-	if err != nil {
-		return "", err
-	}
-	return resp.EventID.String(), err
+	return resp, err
 }
 
 type IncomingMessageCallback func(IncomingMessageMetaData, error)
