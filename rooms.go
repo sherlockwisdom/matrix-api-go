@@ -44,9 +44,9 @@ type RoomType struct {
 type Rooms struct {
 	ID       id.RoomID
 	Channel  chan *event.Event
-	Bridge   Bridges
 	Type     RoomType
 	isBridge bool
+	User     Users
 }
 
 func (r *Rooms) ListenJoinedRooms(
@@ -74,7 +74,7 @@ func (r *Rooms) ListenJoinedRooms(
 		room := Rooms{
 			ID:      roomId,
 			Channel: channel,
-			Bridge:  Bridges{r.Bridge.username},
+			User:    r.User,
 		}
 
 		wg.Add(1)
@@ -98,7 +98,7 @@ func (r *Rooms) ListenJoinedRooms(
 				newRoom := Rooms{
 					ID:      evt.RoomID,
 					Channel: channel,
-					Bridge:  Bridges{r.Bridge.username},
+					User:    r.User,
 				}
 
 				wg.Add(1)
@@ -117,10 +117,6 @@ func (r *Rooms) ListenJoinedRooms(
 			}
 		}
 	}()
-
-	// go func() {
-	// 	r.GetInvites(client)
-	// }()
 
 	wg.Wait()
 	log.Println("[-] Finished listening to rooms...")
@@ -179,7 +175,7 @@ func (r *Rooms) GetRoomMessages(
 
 			userProfile, _ := client.GetProfile(context.Background(), evt.Sender)
 
-			if isHandled, _ := r.Bridge.HandleMessage(evt); isHandled {
+			if isHandled, _ := r.HandleMessage(evt); isHandled {
 				return
 			}
 
@@ -188,18 +184,20 @@ func (r *Rooms) GetRoomMessages(
 				_type = MessageTypeSending
 			}
 
-			incomingMessageMetaData := IncomingMessageMetaData{
-				DisplayName: userProfile.DisplayName,
-				MxID:        evt.Sender,
-				Type:        _type,
-				Message: MessageMetaData{
-					Content:   evt.Content,
-					Timestamp: evt.Timestamp,
-					Type:      evt.Content.Raw["msgtype"],
-				},
-			}
+			if userProfile != nil {
+				incomingMessageMetaData := IncomingMessageMetaData{
+					DisplayName: userProfile.DisplayName,
+					MxID:        evt.Sender,
+					Type:        _type,
+					Message: MessageMetaData{
+						Content:   evt.Content,
+						Timestamp: evt.Timestamp,
+						Type:      evt.Content.Raw["msgtype"],
+					},
+				}
 
-			go callback(incomingMessageMetaData, nil)
+				go callback(incomingMessageMetaData, nil)
+			}
 		}
 	}
 }
@@ -226,8 +224,8 @@ func (r *Rooms) CreateRoom(
 	r.Type = _type
 
 	var clientDB ClientDB = ClientDB{
-		username: r.Bridge.username,
-		filepath: "db/" + r.Bridge.username + ".db",
+		username: r.User.name,
+		filepath: "db/" + r.User.name + ".db",
 	}
 	fmt.Println(clientDB)
 
@@ -260,4 +258,35 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 		panic(err)
 	}
 	return client.DownloadBytes(context.Background(), contentUrl)
+}
+
+func (r *Rooms) HandleMessage(evt *event.Event) (bool, error) {
+	// check room
+	// check template
+
+	if evt.Type == event.EventMessage {
+		var clientDB ClientDB = ClientDB{
+			username: r.User.name,
+			filepath: "db/" + r.User.name + ".db",
+		}
+
+		clientDB.Init()
+		defer clientDB.Close()
+
+		room, err := clientDB.FetchRooms(evt.RoomID.String())
+
+		if err != nil {
+			return false, err
+		}
+
+		if !room.isBridge {
+			return false, nil
+		}
+
+		// log.Println("[+] BRIDGE| New message:", evt.Content.AsMessage().Body)
+		// log.Println(evt.Content.Raw)
+		log.Printf("Bridge message - %v", evt.Content.Raw)
+		return true, nil
+	}
+	return false, nil
 }

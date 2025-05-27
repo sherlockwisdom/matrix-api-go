@@ -90,7 +90,7 @@ func Logout(client *mautrix.Client) error {
 	// Logout from the session
 	_, err := client.Logout(context.Background())
 	if err != nil {
-		log.Fatalf("Logout failed: %v", err)
+		log.Printf("Logout failed: %v\n", err)
 	}
 
 	// TODO: delete the session file
@@ -166,15 +166,16 @@ func Sync(
 func (r *Rooms) GetInvites(
 	client *mautrix.Client,
 	evt *event.Event,
-) {
+) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
 		log.Println("[+] Getting invites for: ", r.ID)
 		if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
 			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
 			err := r.Join(client, evt.RoomID)
 			if err != nil {
-				panic(err)
+				return err
 			}
 		}
 	}
+	return nil
 }

@@ -38,7 +38,7 @@ func CreateProcess(
 	log.Println("[+] Created user: ", username)
 
 	members := "@signalbot:relaysms.me"
-	room.Bridge.username = username
+	room.User.name = username
 	_, err = room.CreateRoom(client, members, roomTypes.Management, true)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func LoginProcess(
 		}
 	}
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
-	room.Bridge.username = username
+	room.User.name = username
 
 	return nil
 }
@@ -76,13 +76,6 @@ func CompleteRun(
 		log.Fatalf("Client access token expected: > 2, got: %d %v", len(client.AccessToken), client.AccessToken)
 		return
 	}
-
-	/*
-		go func() {
-			var bot Bots = Bots{}
-			bot.AddDevice(client, roomId, botChannel)
-		}()
-	*/
 
 	callback := func(inMd IncomingMessageMetaData, err error) {
 		if err != nil {
@@ -109,6 +102,7 @@ func CompleteRun(
 			log.Printf("[-] Type not yet implemented: %v\n", inMd.Message.Content.Raw["msgtype"])
 		}
 	}
+
 	go func() {
 		room.ListenJoinedRooms(client, callback)
 	}()

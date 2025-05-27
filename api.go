@@ -13,6 +13,10 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+type Users struct {
+	name string
+}
+
 type ClientJsonRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -21,6 +25,11 @@ type ClientJsonRequest struct {
 type ClientMessageJsonRequeset struct {
 	AccessToken string `json:"access_token"`
 	Message     string `json:"message"`
+}
+
+type ClientBridgeJsonRequest struct {
+	PlatformName string `json:"platform"`
+	AccessToken  string `json:"access_token"`
 }
 
 func ApiLogin(c *gin.Context) {
@@ -47,10 +56,9 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	bridge := Bridges{username: clientJsonRequest.Username}
 	room := Rooms{
 		Channel: make(chan *event.Event),
-		Bridge:  bridge,
+		User:    Users{name: clientJsonRequest.Username},
 	}
 
 	if err := LoginProcess(client, &room, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
@@ -91,10 +99,9 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	var bridge = Bridges{username: clientJsonRequest.Username}
 	room := Rooms{
 		Channel: make(chan *event.Event),
-		Bridge:  bridge,
+		User:    Users{name: clientJsonRequest.Username},
 	}
 
 	if err := CreateProcess(client, &room, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
@@ -156,6 +163,42 @@ func ApiSendMessage(c *gin.Context) {
 	})
 }
 
+func ApiAddDevice(c *gin.Context) {
+	var bridgeJsonRequest ClientBridgeJsonRequest
+
+	if err := c.ShouldBindJSON(&bridgeJsonRequest); err != nil {
+		log.Printf("Invalid request payload: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON payload"})
+		return
+	}
+
+	if bridgeJsonRequest.PlatformName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Platform name is required"})
+		return
+	}
+
+	bridge := Bridges{name: bridgeJsonRequest.PlatformName}
+
+	homeServer := "https://relaysms.me"
+	client, err := mautrix.NewClient(homeServer, "", bridgeJsonRequest.AccessToken)
+	if err != nil {
+		log.Printf("Failed to create Matrix client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Matrix client"})
+		return
+	}
+
+	websocketUrl, err := bridge.AddDevice(client)
+	if err != nil {
+		log.Printf("Failed to add device: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add device"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"websocket_url": websocketUrl,
+	})
+}
+
 func main() {
 	if len(os.Args) > 1 {
 		password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
@@ -166,10 +209,8 @@ func main() {
 			panic(err)
 		}
 
-		var bridge Bridges
 		var room = Rooms{
 			Channel: make(chan *event.Event, 500),
-			Bridge:  bridge,
 		}
 		switch os.Args[1] {
 		case "--create":
@@ -183,6 +224,15 @@ func main() {
 		case "--login":
 			username := os.Args[2]
 			LoginProcess(client, &room, username, password)
+		case "--websocket":
+			wdChan := make(chan []byte, 1)
+			var wd = WebsocketData{ch: &wdChan}
+			wdChan <- []byte("may the force!")
+			err := wd.MainWebsocket()
+			if err != nil {
+				panic(err)
+			}
+			os.Exit(0)
 		default:
 		}
 		CompleteRun(client, &room)
@@ -192,6 +242,7 @@ func main() {
 	router.POST("/create", ApiCreate)
 	router.POST("/login", ApiLogin)
 	router.POST("/:platform/message/:roomid", ApiSendMessage)
+	router.POST("/:platform/devices/", ApiAddDevice)
 
 	router.Run("localhost:8080")
 }

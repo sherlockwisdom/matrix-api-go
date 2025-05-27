@@ -1,52 +1,49 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
 
 type BridgesInterface interface {
-	Invite()
 	AddDevice(
 		client *mautrix.Client,
 		roomId string,
 	)
 	HandleMessages(*event.Event) (bool, error)
-	ParseImage(*mautrix.Client, string) ([]byte, error)
+	DefaultRoom() (string, error)
 }
 
 type Bridges struct {
 	username string
+	name     string
+	room     Rooms
+	ch       chan *event.Event
 }
 
-func (bridge *Bridges) HandleMessage(evt *event.Event) (bool, error) {
-	// check room
-	// check template
+func (b *Bridges) AddDevice(
+	client *mautrix.Client,
+) (string, error) {
+	addDevicePrompt := "!" + b.name + " login"
+	log.Printf("[+] %sBridge| Sending message to %v\n", b.name, b.room.ID)
 
-	if evt.Type == event.EventMessage {
-		var clientDB ClientDB = ClientDB{
-			username: bridge.username,
-			filepath: "db/" + bridge.username + ".db",
-		}
+	_, err := client.SendText(
+		context.Background(),
+		id.RoomID(b.room.ID),
+		addDevicePrompt,
+	)
 
-		clientDB.Init()
-		defer clientDB.Close()
-
-		room, err := clientDB.FetchRooms(evt.RoomID.String())
-
-		if err != nil {
-			return false, err
-		}
-
-		if !room.isBridge {
-			return false, nil
-		}
-
-		// log.Println("[+] BRIDGE| New message:", evt.Content.AsMessage().Body)
-		log.Println(evt.Content.Raw)
-		return true, nil
+	if err != nil {
+		panic(err)
 	}
-	return false, nil
+
+	for evt := range b.ch {
+		return evt.Content.AsMessage().Body, nil
+	}
+
+	return "", nil
 }
