@@ -226,12 +226,16 @@ func main() {
 		switch os.Args[1] {
 		case "--create":
 			username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
-			CreateProcess(
+			err := CreateProcess(
 				client,
 				&bridge,
 				username,
 				password,
 			)
+
+			if err != nil {
+				panic(err)
+			}
 		case "--login":
 			username := os.Args[2]
 			LoginProcess(client, &bridge, username, password)
