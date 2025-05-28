@@ -29,6 +29,7 @@ type ClientMessageJsonRequeset struct {
 
 type ClientBridgeJsonRequest struct {
 	PlatformName string `json:"platform"`
+	Username     string `json:"username"`
 	AccessToken  string `json:"access_token"`
 }
 
@@ -177,7 +178,12 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	bridge := Bridges{name: bridgeJsonRequest.PlatformName}
+	bridge := Bridges{
+		name: bridgeJsonRequest.PlatformName,
+		room: Rooms{
+			User: Users{bridgeJsonRequest.Username},
+		},
+	}
 
 	homeServer := "https://relaysms.me"
 	client, err := mautrix.NewClient(homeServer, "", bridgeJsonRequest.AccessToken)

@@ -33,6 +33,7 @@ func (clientDb *ClientDB) Init() error {
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
 	clientUsername TEXT NOT NULL,
 	roomID TEXT NOT NULL,
+	name TEXT NOT NULL,
 	members TEXT NOT NULL,
 	type INTEGER NOT NULL,
 	isBridge INTEGER NOT NULL,
@@ -118,6 +119,7 @@ func (clientDb *ClientDB) Close() {
 
 func (clientDb *ClientDB) StoreRooms(
 	roomID string,
+	name string,
 	members string,
 	_type int,
 	isBridge bool,
@@ -129,7 +131,7 @@ func (clientDb *ClientDB) StoreRooms(
 	}
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO rooms (clientUsername, roomID, members, type, isBridge) values(?,?,?,?,?)`,
+		`INSERT INTO rooms (clientUsername, roomID, name, members, type, isBridge) values(?,?,?,?,?,?)`,
 	)
 	if err != nil {
 		return err
@@ -137,7 +139,7 @@ func (clientDb *ClientDB) StoreRooms(
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(clientDb.username, roomID, members, _type, isBridge)
+	_, err = stmt.Exec(clientDb.username, roomID, name, members, _type, isBridge)
 	if err != nil {
 		return err
 	}
@@ -152,20 +154,21 @@ func (clientDb *ClientDB) StoreRooms(
 
 func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, members, type, isBridge from rooms where roomID = ?",
+		"select clientUsername, roomID, name, members, type, isBridge from rooms where roomID = ?",
 	)
 	if err != nil {
 		return Rooms{}, err
 	}
 	var clientUsername string
 	var _roomID string
+	var name string
 	var members string
 	var _type int
 	var isBridge bool
 
 	defer stmt.Close()
 
-	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &members, &_type, &isBridge)
+	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &name, &members, &_type, &isBridge)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Rooms{}, nil
@@ -178,6 +181,47 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 		Channel:  make(chan *event.Event),
 		Type:     RoomType{_type},
 		isBridge: isBridge,
+		Members: map[string]string{
+			name: members,
+		},
+	}
+
+	return room, err
+}
+
+func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
+	log.Println("Fetching room members for", name, clientDb.filepath)
+	stmt, err := clientDb.connection.Prepare(
+		"select clientUsername, roomID, name, members, type, isBridge from rooms where name = ?",
+	)
+	if err != nil {
+		return Rooms{}, err
+	}
+	var clientUsername string
+	var _roomID string
+	var _name string
+	var members string
+	var _type int
+	var isBridge bool
+
+	defer stmt.Close()
+
+	err = stmt.QueryRow(name).Scan(&clientUsername, &_roomID, &_name, &members, &_type, &isBridge)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return Rooms{}, nil
+		}
+		return Rooms{}, err
+	}
+
+	var room = Rooms{
+		ID:       id.RoomID(_roomID),
+		Channel:  make(chan *event.Event),
+		Type:     RoomType{_type},
+		isBridge: isBridge,
+		Members: map[string]string{
+			_name: members,
+		},
 	}
 
 	return room, err

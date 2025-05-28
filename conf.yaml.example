@@ -1,0 +1,10 @@
+bridges:
+  - signal:
+      botname: "@signalbot:relaysms.me"
+      cmd:
+        login: "!signal login"
+
+  - wa:
+      botname: "@whatsappbot:relaysms.me"
+      cmd:
+        login: "!wa login phone"

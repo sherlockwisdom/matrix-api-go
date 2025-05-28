@@ -28,21 +28,45 @@ type Bridges struct {
 func (b *Bridges) AddDevice(
 	client *mautrix.Client,
 ) (string, error) {
-	addDevicePrompt := "!" + b.name + " login"
-	log.Printf("[+] %sBridge| Sending message to %v\n", b.name, b.room.ID)
-
-	_, err := client.SendText(
-		context.Background(),
-		id.RoomID(b.room.ID),
-		addDevicePrompt,
-	)
+	conf, err := (&Conf{}).getConf()
 
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
-	for evt := range b.ch {
-		return evt.Content.AsMessage().Body, nil
+	if cfg, ok := conf.GetBridgeConfig(b.name); ok {
+		var clientDb = ClientDB{
+			username: b.room.User.name,
+			filepath: "db/" + b.room.User.name + ".db",
+		}
+
+		if err := clientDb.Init(); err != nil {
+			return "", err
+		}
+
+		room, err := clientDb.FetchRoomsByMembers(b.name)
+		if err != nil {
+			return "", err
+		}
+
+		b.room = room
+		if loginCmd, exists := cfg.Cmd["login"]; exists {
+			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.name, loginCmd, b.room.ID)
+			_, err = client.SendText(
+				context.Background(),
+				id.RoomID(b.room.ID),
+				loginCmd,
+			)
+
+			if err != nil {
+				return "", err
+			}
+
+			for evt := range b.ch {
+				return evt.Content.AsMessage().Body, nil
+			}
+
+		}
 	}
 
 	return "", nil

@@ -13,16 +13,6 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-/**
-
-- Create account
-
-- Invite the bridge
-
-- Accept all pending invites
-
-**/
-
 func CreateProcess(
 	client *mautrix.Client,
 	room *Rooms,
@@ -37,14 +27,24 @@ func CreateProcess(
 
 	log.Println("[+] Created user: ", username)
 
-	members := "@signalbot:relaysms.me"
-	room.User.name = username
-	_, err = room.CreateRoom(client, members, roomTypes.Management, true)
+	var c Conf
+	cfg, err := c.getConf()
 	if err != nil {
 		return err
 	}
 
-	log.Println("[+] Created room successfully")
+	for _, entry := range cfg.Bridges {
+		for name, config := range entry {
+			log.Println("[+] Creating room for:", name, config.BotName)
+			room.User.name = username
+			roomId, err := room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
+			if err != nil {
+				return err
+			}
+			log.Println("[+] Created room successfully for:", config.BotName, roomId)
+		}
+	}
+
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
 
 	return nil

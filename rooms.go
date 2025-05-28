@@ -47,6 +47,7 @@ type Rooms struct {
 	Type     RoomType
 	isBridge bool
 	User     Users
+	Members  map[string]string
 }
 
 func (r *Rooms) ListenJoinedRooms(
@@ -204,6 +205,7 @@ func (r *Rooms) GetRoomMessages(
 
 func (r *Rooms) CreateRoom(
 	client *mautrix.Client,
+	name string,
 	members string,
 	_type RoomType,
 	isBridge bool,
@@ -232,11 +234,12 @@ func (r *Rooms) CreateRoom(
 	clientDB.Init()
 	if err := clientDB.StoreRooms(
 		r.ID.String(),
+		name,
 		members,
 		_type.Parse(),
 		isBridge,
 	); err != nil {
-		panic(err)
+		return resp.RoomID, err
 	}
 
 	return resp.RoomID, nil
