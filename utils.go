@@ -12,7 +12,9 @@ type BridgeConfig struct {
 }
 
 type Conf struct {
-	Bridges []map[string]BridgeConfig `yaml:"bridges"`
+	HomeServer       string                    `yaml:"homeserver"`
+	HomeServerDomain string                    `yaml:"homeserver_domain"`
+	Bridges          []map[string]BridgeConfig `yaml:"bridges"`
 }
 
 func (c *Conf) getConf() (*Conf, error) {

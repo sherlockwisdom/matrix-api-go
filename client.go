@@ -148,7 +148,6 @@ func Sync(
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		log.Println("[+] New message type: ", evt.Type)
 		go func() {
 			bridge.ch <- evt
 			bridge.GetInvites(client, evt)

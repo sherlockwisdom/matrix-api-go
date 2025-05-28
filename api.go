@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,9 +30,8 @@ type ClientMessageJsonRequeset struct {
 }
 
 type ClientBridgeJsonRequest struct {
-	PlatformName string `json:"platform"`
-	Username     string `json:"username"`
-	AccessToken  string `json:"access_token"`
+	Username    string `json:"username"`
+	AccessToken string `json:"access_token"`
 }
 
 func ApiLogin(c *gin.Context) {
@@ -48,7 +49,8 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	homeServer := "https://relaysms.me"
+	cfg, _ := (&Conf{}).getConf()
+	homeServer := cfg.HomeServer
 
 	client, err := mautrix.NewClient(homeServer, "", "")
 	if err != nil {
@@ -93,7 +95,8 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	homeServer := "https://relaysms.me"
+	cfg, _ := (&Conf{}).getConf()
+	homeServer := cfg.HomeServer
 
 	client, err := mautrix.NewClient(homeServer, "", "")
 	if err != nil {
@@ -141,7 +144,9 @@ func ApiSendMessage(c *gin.Context) {
 		return
 	}
 
-	homeServer := "https://relaysms.me"
+	cfg, _ := (&Conf{}).getConf()
+	homeServer := cfg.HomeServer
+
 	client, err := mautrix.NewClient(homeServer, "", req.AccessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
@@ -170,6 +175,8 @@ func ApiSendMessage(c *gin.Context) {
 
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
+	platformName := c.Param("platform")
+	log.Println("API request platform name:", platformName)
 
 	if err := c.ShouldBindJSON(&bridgeJsonRequest); err != nil {
 		log.Printf("Invalid request payload: %v", err)
@@ -177,43 +184,67 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	if bridgeJsonRequest.PlatformName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Platform name is required"})
-		return
-	}
-
 	bridge := Bridges{
 		ch:   make(chan *event.Event, 1),
-		name: bridgeJsonRequest.PlatformName,
+		name: platformName,
 		room: Rooms{
 			User: Users{bridgeJsonRequest.Username},
 		},
 	}
 
-	homeServer := "https://relaysms.me"
-	client, err := mautrix.NewClient(homeServer, "", bridgeJsonRequest.AccessToken)
+	cfg, _ := (&Conf{}).getConf()
+	homeServer := cfg.HomeServer
+	client, err := mautrix.NewClient(
+		homeServer,
+		id.UserID(fmt.Sprintf("@%s:%s", bridgeJsonRequest.Username, cfg.HomeServerDomain)),
+		bridgeJsonRequest.AccessToken,
+	)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Matrix client"})
 		return
 	}
 
-	websocketUrl, err := bridge.AddDevice(client)
+	image, err := bridge.AddDevice(client)
 	if err != nil {
 		log.Printf("Failed to add device: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add device"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"websocket_url": websocketUrl,
-	})
+	var websocket = WebsocketData{
+		ch:    make(chan []byte, 1),
+		image: image,
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		websocketUrl := <-websocket.ch
+
+		c.JSON(http.StatusOK, gin.H{
+			"websocket_url": string(websocketUrl),
+		})
+		defer wg.Done()
+	}()
+
+	go func() {
+		err = websocket.MainWebsocket(platformName, bridgeJsonRequest.Username)
+		if err != nil {
+			log.Println("Failed to start websocket:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start websocket"})
+			return
+		}
+	}()
+
+	wg.Wait()
 }
 
 func main() {
 	if len(os.Args) > 1 {
+		cfg, _ := (&Conf{}).getConf()
+		homeServer := cfg.HomeServer
 		password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
-		homeServer := "https://relaysms.me"
 
 		client, err := mautrix.NewClient(homeServer, "", "")
 		if err != nil {
@@ -240,10 +271,9 @@ func main() {
 			username := os.Args[2]
 			LoginProcess(client, &bridge, username, password)
 		case "--websocket":
-			wdChan := make(chan []byte, 1)
-			var wd = WebsocketData{ch: &wdChan}
-			wdChan <- []byte("may the force!")
-			err := wd.MainWebsocket()
+			var wd = WebsocketData{ch: make(chan []byte, 1)}
+			wd.ch <- []byte("may the force!")
+			err := wd.MainWebsocket("testingPlatform", "testingUser")
 			if err != nil {
 				panic(err)
 			}
@@ -254,7 +284,7 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.POST("/create", ApiCreate)
+	router.POST("/", ApiCreate)
 	router.POST("/login", ApiLogin)
 	router.POST("/:platform/message/:roomid", ApiSendMessage)
 	router.POST("/:platform/devices/", ApiAddDevice)

@@ -1,3 +1,5 @@
+homeserver: "https://relaysms.me"
+homeserver_domain: "relaysms.me"
 bridges:
   - signal:
       botname: "@signalbot:relaysms.me"
