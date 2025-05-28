@@ -48,8 +48,12 @@ func (b *Bridges) AddDevice(
 		if err != nil {
 			return "", err
 		}
+		log.Println("Room:", room)
 
 		b.room = room
+
+		go Sync(client, b)
+
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
 			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.name, loginCmd, b.room.ID)
 			_, err = client.SendText(
@@ -63,7 +67,10 @@ func (b *Bridges) AddDevice(
 			}
 
 			for evt := range b.ch {
-				return evt.Content.AsMessage().Body, nil
+				msg := evt.Content.AsMessage().Body
+				log.Println("New message adding device:", msg)
+
+				return msg, nil
 			}
 
 		}

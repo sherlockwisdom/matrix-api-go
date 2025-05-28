@@ -57,12 +57,14 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	room := Rooms{
-		Channel: make(chan *event.Event),
-		User:    Users{name: clientJsonRequest.Username},
+	var bridge = Bridges{
+		ch: make(chan *event.Event),
+		room: Rooms{
+			User: Users{name: clientJsonRequest.Username},
+		},
 	}
 
-	if err := LoginProcess(client, &room, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
+	if err := LoginProcess(client, &bridge, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
 		log.Printf("Login failed for %s: %v", clientJsonRequest.Username, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Login failed", "details": err.Error()})
 		return
@@ -100,12 +102,14 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	room := Rooms{
-		Channel: make(chan *event.Event),
-		User:    Users{name: clientJsonRequest.Username},
+	var bridge = Bridges{
+		ch: make(chan *event.Event),
+		room: Rooms{
+			User: Users{name: clientJsonRequest.Username},
+		},
 	}
 
-	if err := CreateProcess(client, &room, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
+	if err := CreateProcess(client, &bridge, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
 		log.Printf("User creation failed for %s: %v", clientJsonRequest.Username, err)
 		c.JSON(http.StatusConflict, gin.H{"error": "User creation failed", "details": err.Error()})
 		return
@@ -179,6 +183,7 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	bridge := Bridges{
+		ch:   make(chan *event.Event, 1),
 		name: bridgeJsonRequest.PlatformName,
 		room: Rooms{
 			User: Users{bridgeJsonRequest.Username},
@@ -215,21 +220,21 @@ func main() {
 			panic(err)
 		}
 
-		var room = Rooms{
-			Channel: make(chan *event.Event, 500),
+		var bridge = Bridges{
+			ch: make(chan *event.Event, 500),
 		}
 		switch os.Args[1] {
 		case "--create":
 			username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
 			CreateProcess(
 				client,
-				&room,
+				&bridge,
 				username,
 				password,
 			)
 		case "--login":
 			username := os.Args[2]
-			LoginProcess(client, &room, username, password)
+			LoginProcess(client, &bridge, username, password)
 		case "--websocket":
 			wdChan := make(chan []byte, 1)
 			var wd = WebsocketData{ch: &wdChan}
@@ -241,7 +246,7 @@ func main() {
 			os.Exit(0)
 		default:
 		}
-		CompleteRun(client, &room)
+		CompleteRun(client, &bridge)
 	}
 
 	router := gin.Default()

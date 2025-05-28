@@ -229,7 +229,6 @@ func (r *Rooms) CreateRoom(
 		username: r.User.name,
 		filepath: "db/" + r.User.name + ".db",
 	}
-	fmt.Println(clientDB)
 
 	clientDB.Init()
 	if err := clientDB.StoreRooms(

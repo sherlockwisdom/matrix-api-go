@@ -142,16 +142,16 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 
 func Sync(
 	client *mautrix.Client,
-	room *Rooms,
+	bridge *Bridges,
 ) error {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		// log.Println("[+] New message type: ", evt.Type)
+		log.Println("[+] New message type: ", evt.Type)
 		go func() {
-			room.Channel <- evt
-			room.GetInvites(client, evt)
+			bridge.ch <- evt
+			bridge.GetInvites(client, evt)
 		}()
 	})
 
@@ -163,15 +163,15 @@ func Sync(
 	return nil
 }
 
-func (r *Rooms) GetInvites(
+func (b *Bridges) GetInvites(
 	client *mautrix.Client,
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
-		log.Println("[+] Getting invites for: ", r.ID)
+		log.Println("[+] Getting invites for: ", b.room.ID)
 		if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
 			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
-			err := r.Join(client, evt.RoomID)
+			err := b.room.Join(client, evt.RoomID)
 			if err != nil {
 				return err
 			}
