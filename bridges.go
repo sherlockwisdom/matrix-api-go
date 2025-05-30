@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"maunium.net/go/mautrix"
@@ -19,18 +20,19 @@ type BridgesInterface interface {
 }
 
 type Bridges struct {
-	name string
-	room Rooms
-	ch   chan *event.Event
+	name    string
+	room    Rooms
+	chEvt   chan *event.Event
+	chImage chan []byte
 }
 
 func (b *Bridges) AddDevice(
 	client *mautrix.Client,
-) ([]byte, error) {
+) error {
 	conf, err := (&Conf{}).getConf()
 
 	if err != nil {
-		return []byte{}, err
+		return err
 	}
 
 	if cfg, ok := conf.GetBridgeConfig(b.name); ok {
@@ -41,12 +43,12 @@ func (b *Bridges) AddDevice(
 		}
 
 		if err := clientDb.Init(); err != nil {
-			return []byte{}, err
+			return err
 		}
 
 		room, err := clientDb.FetchRoomsByMembers(b.name)
 		if err != nil {
-			return []byte{}, err
+			return err
 		}
 		log.Println("Room:", room)
 
@@ -59,6 +61,27 @@ func (b *Bridges) AddDevice(
 		}()
 
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
+			go func() {
+				for evt := range b.chEvt {
+					if evt.Type == event.EventMessage && evt.RoomID == b.room.ID && evt.Sender != client.UserID {
+						// msg := evt.Content.AsMessage().Body
+						fmt.Println(evt.Content)
+						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
+							url := evt.Content.AsMessage().URL
+							file, err := ParseImage(client, string(url))
+							if err != nil {
+								fmt.Println(err)
+							}
+
+							log.Println("New message adding device:", evt.Content.AsMessage().FileName)
+							// return file, nil
+							b.chImage <- file
+						}
+					}
+				}
+
+			}()
+
 			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.name, loginCmd, b.room.ID)
 			_, err = client.SendText(
 				context.Background(),
@@ -67,25 +90,12 @@ func (b *Bridges) AddDevice(
 			)
 
 			if err != nil {
-				return []byte{}, err
-			}
-
-			for evt := range b.ch {
-				if evt.Type == event.EventMessage && evt.RoomID == b.room.ID {
-					// msg := evt.Content.AsMessage().Body
-					url := evt.Content.AsMessage().URL
-					file, err := ParseImage(client, string(url))
-					if err != nil {
-						return []byte{}, nil
-					}
-
-					log.Println("New message adding device:", evt.Content.AsMessage().FileName)
-					return file, nil
-				}
+				return err
 			}
 
 		}
+
 	}
 
-	return []byte{}, err
+	return err
 }

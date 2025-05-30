@@ -15,13 +15,20 @@ type WebsocketDataInterface interface {
 }
 
 type WebsocketData struct {
-	ch    chan []byte
-	image []byte
+	ch     chan []byte
+	Bridge Bridges
 }
 
 func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrader.Upgrade(w, r, nil)
 	defer conn.Close()
+
+	err := conn.WriteMessage(websocket.TextMessage, []byte("Welcome!!"))
+
+	if err != nil {
+		log.Println(err)
+	}
+
 	for {
 		// msgType, msg, err := conn.ReadMessage()
 		// if err != nil {
@@ -31,9 +38,9 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 		// println("Received:", string(msg))
 
 		// // Respond with Hello, World!
-		// data := <-wd.ch
-		log.Println("Image going back:", wd.image)
-		err := conn.WriteMessage(websocket.TextMessage, wd.image)
+		data := <-wd.Bridge.chImage
+		fmt.Println(data)
+		err := conn.WriteMessage(websocket.TextMessage, []byte("Websocket image"))
 		if err != nil {
 			log.Println(err)
 		}

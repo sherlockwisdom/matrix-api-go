@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -60,7 +59,7 @@ func ApiLogin(c *gin.Context) {
 	}
 
 	var bridge = Bridges{
-		ch: make(chan *event.Event),
+		chEvt: make(chan *event.Event),
 		room: Rooms{
 			User: Users{name: clientJsonRequest.Username},
 		},
@@ -106,7 +105,7 @@ func ApiCreate(c *gin.Context) {
 	}
 
 	var bridge = Bridges{
-		ch: make(chan *event.Event),
+		chEvt: make(chan *event.Event),
 		room: Rooms{
 			User: Users{name: clientJsonRequest.Username},
 		},
@@ -185,8 +184,8 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	bridge := Bridges{
-		ch:   make(chan *event.Event, 1),
-		name: platformName,
+		chEvt: make(chan *event.Event, 1),
+		name:  platformName,
 		room: Rooms{
 			User: Users{bridgeJsonRequest.Username},
 		},
@@ -196,7 +195,8 @@ func ApiAddDevice(c *gin.Context) {
 	homeServer := cfg.HomeServer
 	client, err := mautrix.NewClient(
 		homeServer,
-		id.UserID(fmt.Sprintf("@%s:%s", bridgeJsonRequest.Username, cfg.HomeServerDomain)),
+		// id.UserID(fmt.Sprintf("@%s:%s", bridgeJsonRequest.Username, cfg.HomeServerDomain)),
+		id.NewUserID(bridgeJsonRequest.Username, cfg.HomeServerDomain),
 		bridgeJsonRequest.AccessToken,
 	)
 	if err != nil {
@@ -205,16 +205,8 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	image, err := bridge.AddDevice(client)
-	if err != nil {
-		log.Printf("Failed to add device: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add device"})
-		return
-	}
-
 	var websocket = WebsocketData{
-		ch:    make(chan []byte, 1),
-		image: image,
+		ch: make(chan []byte, 1),
 	}
 
 	var wg sync.WaitGroup
@@ -237,6 +229,13 @@ func ApiAddDevice(c *gin.Context) {
 		}
 	}()
 
+	err = bridge.AddDevice(client)
+	if err != nil {
+		log.Printf("Failed to add device: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add device"})
+		return
+	}
+
 	wg.Wait()
 }
 
@@ -252,7 +251,7 @@ func main() {
 		}
 
 		var bridge = Bridges{
-			ch: make(chan *event.Event, 500),
+			chEvt: make(chan *event.Event, 500),
 		}
 		switch os.Args[1] {
 		case "--create":

@@ -149,7 +149,7 @@ func Sync(
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
 		go func() {
-			bridge.ch <- evt
+			bridge.chEvt <- evt
 			bridge.GetInvites(client, evt)
 		}()
 	})
