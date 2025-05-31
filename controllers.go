@@ -36,8 +36,8 @@ func CreateProcess(
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
 			log.Println("[+] Creating room for:", name, config.BotName)
-			bridge.room.User.name = username
-			roomId, err := bridge.room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
+			bridge.Room.User.name = username
+			roomId, err := bridge.Room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
 			if err != nil {
 				return err
 			}
@@ -63,7 +63,7 @@ func LoginProcess(
 		}
 	}
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
-	bridge.room.User.name = username
+	bridge.Room.User.name = username
 
 	return nil
 }
@@ -104,7 +104,7 @@ func CompleteRun(
 	}
 
 	go func() {
-		bridge.room.ListenJoinedRooms(client, callback)
+		bridge.Room.ListenJoinedRooms(client, callback)
 	}()
 
 	go func() {

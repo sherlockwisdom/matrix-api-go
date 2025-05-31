@@ -149,7 +149,7 @@ func Sync(
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
 		go func() {
-			bridge.chEvt <- evt
+			bridge.ChEvt <- evt
 			bridge.GetInvites(client, evt)
 		}()
 	})
@@ -167,10 +167,10 @@ func (b *Bridges) GetInvites(
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
-		log.Println("[+] Getting invites for: ", b.room.ID)
+		log.Println("[+] Getting invites for: ", b.Room.ID)
 		if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
 			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
-			err := b.room.Join(client, evt.RoomID)
+			err := b.Room.Join(client, evt.RoomID)
 			if err != nil {
 				return err
 			}

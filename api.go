@@ -59,8 +59,8 @@ func ApiLogin(c *gin.Context) {
 	}
 
 	var bridge = Bridges{
-		chEvt: make(chan *event.Event),
-		room: Rooms{
+		ChEvt: make(chan *event.Event),
+		Room: Rooms{
 			User: Users{name: clientJsonRequest.Username},
 		},
 	}
@@ -105,8 +105,8 @@ func ApiCreate(c *gin.Context) {
 	}
 
 	var bridge = Bridges{
-		chEvt: make(chan *event.Event),
-		room: Rooms{
+		ChEvt: make(chan *event.Event),
+		Room: Rooms{
 			User: Users{name: clientJsonRequest.Username},
 		},
 	}
@@ -183,22 +183,26 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	bridge := Bridges{
-		chEvt: make(chan *event.Event, 1),
-		name:  platformName,
-		room: Rooms{
-			User: Users{bridgeJsonRequest.Username},
-		},
-	}
-
 	cfg, _ := (&Conf{}).getConf()
 	homeServer := cfg.HomeServer
+
 	client, err := mautrix.NewClient(
 		homeServer,
 		// id.UserID(fmt.Sprintf("@%s:%s", bridgeJsonRequest.Username, cfg.HomeServerDomain)),
 		id.NewUserID(bridgeJsonRequest.Username, cfg.HomeServerDomain),
 		bridgeJsonRequest.AccessToken,
 	)
+
+	bridge := Bridges{
+		ChEvt:   make(chan *event.Event, 1),
+		ChImage: make(chan []byte, 1),
+		Name:    platformName,
+		Room: Rooms{
+			User: Users{bridgeJsonRequest.Username},
+		},
+		Client: client,
+	}
+
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Matrix client"})
@@ -206,7 +210,8 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	var websocket = WebsocketData{
-		ch: make(chan []byte, 1),
+		ch:     make(chan []byte, 1),
+		Bridge: &bridge,
 	}
 
 	var wg sync.WaitGroup
@@ -229,13 +234,6 @@ func ApiAddDevice(c *gin.Context) {
 		}
 	}()
 
-	err = bridge.AddDevice(client)
-	if err != nil {
-		log.Printf("Failed to add device: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add device"})
-		return
-	}
-
 	wg.Wait()
 }
 
@@ -251,7 +249,7 @@ func main() {
 		}
 
 		var bridge = Bridges{
-			chEvt: make(chan *event.Event, 500),
+			ChEvt: make(chan *event.Event, 500),
 		}
 		switch os.Args[1] {
 		case "--create":

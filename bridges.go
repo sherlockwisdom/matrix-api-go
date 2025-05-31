@@ -20,10 +20,11 @@ type BridgesInterface interface {
 }
 
 type Bridges struct {
-	name    string
-	room    Rooms
-	chEvt   chan *event.Event
-	chImage chan []byte
+	Name    string
+	Room    Rooms
+	Client  *mautrix.Client
+	ChEvt   chan *event.Event
+	ChImage chan []byte
 }
 
 func (b *Bridges) AddDevice(
@@ -35,24 +36,24 @@ func (b *Bridges) AddDevice(
 		return err
 	}
 
-	if cfg, ok := conf.GetBridgeConfig(b.name); ok {
-		log.Println("Getting configs for:", b.name)
+	if cfg, ok := conf.GetBridgeConfig(b.Name); ok {
+		log.Println("Getting configs for:", b.Name)
 		var clientDb = ClientDB{
-			username: b.room.User.name,
-			filepath: "db/" + b.room.User.name + ".db",
+			username: b.Room.User.name,
+			filepath: "db/" + b.Room.User.name + ".db",
 		}
 
 		if err := clientDb.Init(); err != nil {
 			return err
 		}
 
-		room, err := clientDb.FetchRoomsByMembers(b.name)
+		room, err := clientDb.FetchRoomsByMembers(b.Name)
 		if err != nil {
 			return err
 		}
 		log.Println("Room:", room)
 
-		b.room = room
+		b.Room = room
 
 		go func() {
 			if err := Sync(client, b); err != nil {
@@ -62,10 +63,8 @@ func (b *Bridges) AddDevice(
 
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
 			go func() {
-				for evt := range b.chEvt {
-					if evt.Type == event.EventMessage && evt.RoomID == b.room.ID && evt.Sender != client.UserID {
-						// msg := evt.Content.AsMessage().Body
-						fmt.Println(evt.Content)
+				for evt := range b.ChEvt {
+					if evt.Type == event.EventMessage && evt.RoomID == b.Room.ID && evt.Sender != client.UserID {
 						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
 							url := evt.Content.AsMessage().URL
 							file, err := ParseImage(client, string(url))
@@ -73,19 +72,18 @@ func (b *Bridges) AddDevice(
 								fmt.Println(err)
 							}
 
-							log.Println("New message adding device:", evt.Content.AsMessage().FileName)
 							// return file, nil
-							b.chImage <- file
+							b.ChImage <- file
+							log.Println("New message adding device:", evt.Content.AsMessage().FileName)
 						}
 					}
 				}
-
 			}()
 
-			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.name, loginCmd, b.room.ID)
+			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.Room.ID)
 			_, err = client.SendText(
 				context.Background(),
-				id.RoomID(b.room.ID),
+				id.RoomID(b.Room.ID),
 				loginCmd,
 			)
 
