@@ -49,7 +49,6 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Println("Error sending message to client socket", err)
 			}
-			break
 		}
 	}()
 

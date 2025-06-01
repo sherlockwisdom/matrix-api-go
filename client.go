@@ -155,8 +155,38 @@ func Sync(
 	})
 
 	log.Println("Syncing...")
-	if err := client.Sync(); err != nil {
-		return err
+	// var since string
+
+	for {
+		if err := client.Sync(); err != nil {
+			return err
+		}
+
+		// // First sync: get latest state and capture since token
+		// log.Println(since)
+		// resp, err := client.SyncRequest(context.Background(), 60000, since, "", true, event.PresenceOffline)
+		// if err != nil {
+		// 	log.Fatalf("Failed to sync: %v", err)
+		// }
+
+		// if resp.NextBatch == since {
+		// 	log.Println("[sync] No new events. Waiting...")
+		// 	time.Sleep(2 * time.Second)
+		// 	continue
+		// }
+
+		// since = resp.NextBatch // store the new since token
+
+		// for _, roomData := range resp.Rooms.Join {
+		// 	for _, evt := range roomData.Timeline.Events {
+		// 		if evt.Type == event.EventMessage {
+		// 			// body := evt.Content.AsMessage().Body
+		// 			// fmt.Printf("New message in %s: %s\n", roomID, body)
+		// 			bridge.ChEvt <- evt
+		// 			bridge.GetInvites(client, evt)
+		// 		}
+		// 	}
+		// }
 	}
 
 	return nil
