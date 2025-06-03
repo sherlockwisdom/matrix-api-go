@@ -373,7 +373,7 @@ func main() {
 	host := cfg.Server.Host
 	port := cfg.Server.Port
 	if cfg.Server.Tls.Crt != "" && cfg.Server.Tls.Key != "" {
-		router.RunTLS(fmt.Sprintf("%s:%s", host, port), cfg.Server.Tls.Crt, cfg.Server.Tls.Key)
+		router.RunTLS(fmt.Sprintf(":%s", port), cfg.Server.Tls.Crt, cfg.Server.Tls.Key)
 		return
 	}
 	router.Run(fmt.Sprintf("%s:%s", host, port))
