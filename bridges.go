@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -63,9 +64,10 @@ func (b *Bridges) AddDevice(
 
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
 			go func() {
+				since := time.Now().UnixMilli()
 				for evt := range b.ChEvt {
 					if evt.Type == event.EventMessage && evt.RoomID == b.Room.ID && evt.Sender != client.UserID {
-						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
+						if evt.Timestamp >= since && event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
 							url := evt.Content.AsMessage().URL
 							file, err := ParseImage(client, string(url))
 							if err != nil {
