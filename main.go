@@ -8,31 +8,60 @@ import (
 	"sync"
 	"time"
 
+	_ "sherlock/matrix/docs"
+
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
+// Users represents a user entity
+// @Description Represents a user structure with a name
+// @name Users
+// @type object
 type Users struct {
 	name string
 }
 
+// ClientJsonRequest represents login or registration data
+// @Description Request payload for user login or registration
+// @name ClientJsonRequest
+// @type object
 type ClientJsonRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
+// ClientMessageJsonRequeset represents a message sending request
+// @Description Request payload to send a message to a room
+// @name ClientMessageJsonRequeset
+// @type object
 type ClientMessageJsonRequeset struct {
 	AccessToken string `json:"access_token"`
 	Message     string `json:"message"`
 }
 
+// ClientBridgeJsonRequest represents bridge connection details
+// @Description Request payload to bind a platform bridge to a user
+// @name ClientBridgeJsonRequest
+// @type object
 type ClientBridgeJsonRequest struct {
 	Username    string `json:"username"`
 	AccessToken string `json:"access_token"`
 }
 
+// ApiLogin godoc
+// @Summary Logs a user into the Matrix server
+// @Accept  json
+// @Produce  json
+// @Param   payload body ClientJsonRequest true "Login Credentials"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /login [post]
 func ApiLogin(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
 
@@ -78,6 +107,15 @@ func ApiLogin(c *gin.Context) {
 	})
 }
 
+// ApiCreate godoc
+// @Summary Creates a new user on the Matrix server
+// @Accept  json
+// @Produce  json
+// @Param   payload body ClientJsonRequest true "User Registration"
+// @Success 201 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Router / [post]
 func ApiCreate(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
 
@@ -123,6 +161,17 @@ func ApiCreate(c *gin.Context) {
 	})
 }
 
+// ApiSendMessage godoc
+// @Summary Sends a message to a specified room
+// @Accept  json
+// @Produce  json
+// @Param   platform path string true "Platform Name"
+// @Param   roomid path string true "Room ID"
+// @Param   payload body ClientMessageJsonRequeset true "Message Payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{platform}/message/{roomid} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
 	roomID := c.Param("roomid")
@@ -172,6 +221,16 @@ func ApiSendMessage(c *gin.Context) {
 	})
 }
 
+// ApiAddDevice godoc
+// @Summary Adds a device/bridge for a given platform
+// @Accept  json
+// @Produce  json
+// @Param   platform path string true "Platform Name"
+// @Param   payload body ClientBridgeJsonRequest true "Bridge Payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /{platform}/devices/ [post]
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
 	platformName := c.Param("platform")
@@ -237,6 +296,24 @@ func ApiAddDevice(c *gin.Context) {
 	wg.Wait()
 }
 
+// @title           Swagger Example API
+// @version         2.0
+// @description     This is a sample server celler server.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:8080
+
+// @securityDefinitions.basic  BasicAuth
+
+// @externalDocs.description  OpenAPI
+// @externalDocs.url          https://swagger.io/resources/open-api/
 func main() {
 	if len(os.Args) > 1 {
 		cfg, _ := (&Conf{}).getConf()
@@ -285,6 +362,7 @@ func main() {
 	router.POST("/login", ApiLogin)
 	router.POST("/:platform/message/:roomid", ApiSendMessage)
 	router.POST("/:platform/devices/", ApiAddDevice)
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	router.Run("localhost:8080")
 }
