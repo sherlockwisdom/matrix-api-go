@@ -11,7 +11,19 @@ type BridgeConfig struct {
 	Cmd     map[string]string `yaml:"cmd"` // ← map instead of slice of maps
 }
 
+type Tls struct {
+	Crt string `yaml:"crt"`
+	Key string `yaml:"key"`
+}
+
+type Server struct {
+	Port string `yaml:"port"`
+	Host string `yaml:"host"`
+	Tls  Tls    `yaml:"tls"`
+}
+
 type Conf struct {
+	Server           Server                    `yaml:"server"`
 	HomeServer       string                    `yaml:"homeserver"`
 	HomeServerDomain string                    `yaml:"homeserver_domain"`
 	Bridges          []map[string]BridgeConfig `yaml:"bridges"`
