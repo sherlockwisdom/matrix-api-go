@@ -75,5 +75,5 @@ func (wd *WebsocketData) MainWebsocket(platformName string, username string) err
 		return http.ListenAndServeTLS(":8090", cfg.Server.Tls.Crt, cfg.Server.Tls.Key, nil)
 	}
 
-	return nil
+	return http.ListenAndServe(":8090", nil)
 }
