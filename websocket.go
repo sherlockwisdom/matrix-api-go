@@ -66,5 +66,14 @@ func (wd *WebsocketData) MainWebsocket(platformName string, username string) err
 	http.HandleFunc(websocketUrl, wd.Handler)
 	wd.ch <- []byte(websocketUrl)
 
-	return http.ListenAndServe(":8090", nil)
+	cfg, err := (&Conf{}).getConf()
+	if err != nil {
+		panic(err)
+	}
+
+	if cfg.Server.Tls.Crt != "" && cfg.Server.Tls.Key != "" {
+		return http.ListenAndServeTLS(":8090", cfg.Server.Tls.Crt, cfg.Server.Tls.Key, nil)
+	}
+
+	return nil
 }
