@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -66,8 +67,18 @@ func (b *Bridges) AddDevice(
 			go func() {
 				since := time.Now().UnixMilli()
 				for evt := range b.ChEvt {
-					if evt.Type == event.EventMessage && evt.RoomID == b.Room.ID && evt.Sender != client.UserID {
-						if evt.Timestamp >= since && event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
+					if evt.RoomID == b.Room.ID && evt.Sender != client.UserID && evt.Timestamp >= since &&
+						evt.Type == event.EventMessage {
+						failedCmd := cfg.Cmd["failed"]
+
+						if evt.Content.Raw["msgtype"] == "m.notice" &&
+							strings.Contains(evt.Content.AsMessage().Body, failedCmd) {
+							log.Println("Get new notice to failed:", evt)
+							b.ChImage <- nil
+							break
+						}
+
+						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
 							url := evt.Content.AsMessage().URL
 							file, err := ParseImage(client, string(url))
 							if err != nil {
@@ -77,6 +88,7 @@ func (b *Bridges) AddDevice(
 							// return file, nil
 							b.ChImage <- file
 							log.Println("New message adding device:", evt.Content.AsMessage().FileName)
+							continue
 						}
 					}
 				}

@@ -19,6 +19,10 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+var GlobalWebsocketConnection = WebsocketData{
+	ch: make(chan []byte, 500),
+}
+
 // Users represents a user entity
 // @Description Represents a user structure with a name
 // @name Users
@@ -274,6 +278,8 @@ func ApiAddDevice(c *gin.Context) {
 		Bridge: &bridge,
 	}
 
+	websocket.RegisterWebsocket(platformName, bridgeJsonRequest.Username)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -283,16 +289,6 @@ func ApiAddDevice(c *gin.Context) {
 			"websocket_url": string(websocketUrl),
 		})
 		defer wg.Done()
-	}()
-
-	go func() {
-		err = websocket.MainWebsocket(platformName, bridgeJsonRequest.Username)
-		if err != nil {
-			log.Println("Failed to start websocket:", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start websocket"})
-			defer wg.Done()
-			return
-		}
 	}()
 
 	wg.Wait()
@@ -349,7 +345,7 @@ func main() {
 		case "--websocket":
 			var wd = WebsocketData{ch: make(chan []byte, 1)}
 			wd.ch <- []byte("may the force!")
-			err := wd.MainWebsocket("testingPlatform", "testingUser")
+			err := wd.MainWebsocket(false)
 			if err != nil {
 				panic(err)
 			}
@@ -374,8 +370,21 @@ func main() {
 	host := cfg.Server.Host
 	port := cfg.Server.Port
 	if cfg.Server.Tls.Crt != "" && cfg.Server.Tls.Key != "" {
+		go func() {
+			err := GlobalWebsocketConnection.MainWebsocket(true)
+			if err != nil {
+				panic(err)
+			}
+		}()
 		router.RunTLS(fmt.Sprintf(":%s", port), cfg.Server.Tls.Crt, cfg.Server.Tls.Key)
 		return
 	}
+
+	go func() {
+		err := GlobalWebsocketConnection.MainWebsocket(false)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	router.Run(fmt.Sprintf("%s:%s", host, port))
 }

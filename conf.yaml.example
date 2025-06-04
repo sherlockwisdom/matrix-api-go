@@ -11,8 +11,10 @@ bridges:
       botname: "@signalbot:relaysms.me"
       cmd:
         login: "!signal login"
+        failed: ""
 
   - wa:
       botname: "@whatsappbot:relaysms.me"
       cmd:
         login: "!wa login qr"
+        failed: "Login failed: Entering code or scanning QR timed out. Please try again."
