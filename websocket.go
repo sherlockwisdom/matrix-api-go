@@ -102,8 +102,11 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 func (wd *WebsocketData) RegisterWebsocket(platformName string, username string) {
 	if index := GetWebsocketIndex(wd); index > -1 {
 		log.Println("[+] Incoming socket connection but one already exist", wd.Bridge.Client.UserID)
+		/*
 		GlobalWebsocketConnection.Registry =
 			slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
+		*/
+		wd = GlobalWebsocketConnection.Registry[index].Websocket
 		log.Println("[+] Deleted socket at index", index)
 	}
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
