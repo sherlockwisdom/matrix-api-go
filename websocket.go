@@ -76,6 +76,7 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (wd *WebsocketData) MainWebsocket(platformName string, username string) error {
+	wd.Bridge.Room.User.name = username
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 	http.HandleFunc(websocketUrl, wd.Handler)
 	wd.ch <- []byte(websocketUrl)
