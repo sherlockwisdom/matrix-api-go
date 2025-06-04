@@ -48,11 +48,6 @@ func GetWebsocketIndex(wd *WebsocketData) int {
 }
 
 func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
-	if index := GetWebsocketIndex(wd); index == -1 {
-		log.Println("[+] Incoming socket connection but no mapped request", wd.Bridge.Client.UserID)
-		return
-	}
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
@@ -62,35 +57,27 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(c *websocket.Conn) {
+		defer wg.Done()
 		for {
 			data := <-wd.Bridge.ChImage
 			fmt.Println(data)
 			if data == nil {
-				if index := GetWebsocketIndex(wd); index > -1 {
-					GlobalWebsocketConnection.Registry =
-						slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-					log.Println("Deleting websocket map at", index)
-					wg.Done()
-				}
+				return
 			}
-			fmt.Println("Websocket starting for:", wd.Bridge.Client.UserID)
+
+			fmt.Println("Websocket sending message for:", wd.Bridge.Client.UserID)
 			// err := conn.WriteMessage(websocket.TextMessage, []byte("Websocket image"))
 
 			if c == nil {
 				log.Println("Error connecting socket, client is nil")
-				wg.Done()
+				return
 			}
 
 			err := c.WriteMessage(websocket.BinaryMessage, data)
 			// err := conn.WriteMessage(websocket.TextMessage, data)
 			if err != nil {
 				log.Println("Error sending message to client socket", err)
-				if index := GetWebsocketIndex(wd); index > -1 {
-					GlobalWebsocketConnection.Registry =
-						slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-					log.Println("Deleting websocket map at", index)
-				}
-				wg.Done()
+				return
 			}
 		}
 	}(conn)
@@ -101,10 +88,22 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer func() {
+		if index := GetWebsocketIndex(wd); index > -1 {
+			GlobalWebsocketConnection.Registry =
+				slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
+			log.Println("Deleting websocket map at", index)
+		}
+	}()
+
 	wg.Wait()
 }
 
 func (wd *WebsocketData) RegisterWebsocket(platformName string, username string) {
+	if index := GetWebsocketIndex(wd); index == -1 {
+		log.Println("[+] Incoming socket connection but no mapped request", wd.Bridge.Client.UserID)
+		return
+	}
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 	http.HandleFunc(websocketUrl, wd.Handler)
 	GlobalWebsocketConnection.Registry = append(GlobalWebsocketConnection.Registry, &WebsocketMap{
