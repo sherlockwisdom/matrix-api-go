@@ -89,8 +89,8 @@
 
             // Determine WebSocket host based on current page's protocol
             if (window.location.protocol === 'file:') {
-                // When opened via file://, default to localhost:8080
-                wsHost = 'localhost:8090';
+                // When opened via file://, default to localhost:8090
+                wsHost = 'localhost:8090'; // Changed from 8080 to 8090
                 updateStatus(`Detected file:// protocol. Attempting to connect to default local WebSocket server: ${wsHost}${path}`);
             } else {
                 // For http:// or https:// protocols, use the current host
