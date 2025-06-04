@@ -64,7 +64,6 @@ func Login(client *mautrix.Client, username string, password string) (string, er
 		User: username,
 	}
 
-	// Login using username and password
 	resp, err := client.Login(context.Background(), &mautrix.ReqLogin{
 		Type: "m.login.password",
 		// User:     id.UserID(username),

@@ -59,7 +59,7 @@ func (b *Bridges) AddDevice(
 
 		go func() {
 			if err := Sync(client, b); err != nil {
-				log.Println(err)
+				log.Println("Error with syncing", err)
 			}
 		}()
 
