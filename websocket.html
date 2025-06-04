@@ -71,26 +71,33 @@
         // Main function to initialize the WebSocket connection
         function initializeWebSocket() {
             const path = getQueryParam('path');
-            const wsHost = getQueryParam('ws_host'); // Parameter for file:// protocol
 
             if (!path) {
                 updateStatus('Error: "path" parameter missing in URL. Please provide it like ?path=/ws/your_endpoint', 'error');
                 return;
             }
 
-            let wsUrl;
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsProtocol;
+            let wsHost;
 
+            // Determine WebSocket protocol based on current page's protocol
+            if (window.location.protocol === 'https:') {
+                wsProtocol = 'wss:';
+            } else {
+                wsProtocol = 'ws:';
+            }
+
+            // Determine WebSocket host based on current page's protocol
             if (window.location.protocol === 'file:') {
-                if (!wsHost) {
-                    updateStatus('Error: When using file:// protocol, "ws_host" parameter is required (e.g., ?path=/ws/your_endpoint&ws_host=localhost:8080)', 'error');
-                    return;
-                }
-                wsUrl = `ws://${wsHost}${path}`;
+                // When opened via file://, default to localhost:8080
+                wsHost = 'localhost:8090';
+                updateStatus(`Detected file:// protocol. Attempting to connect to default local WebSocket server: ${wsHost}${path}`);
             } else {
                 // For http:// or https:// protocols, use the current host
-                wsUrl = `${wsProtocol}//${window.location.host}${path}`;
+                wsHost = window.location.host;
             }
+
+            const wsUrl = `${wsProtocol}//${wsHost}${path}`;
 
             updateStatus(`Connecting to WebSocket at: ${wsUrl}`);
 
