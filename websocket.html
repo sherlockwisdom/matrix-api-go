@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Image Viewer</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better image display and scrollability */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+        }
+        .image-display-area {
+            /* This will be the container for the single image */
+            @apply bg-white p-6 rounded-xl shadow-lg flex justify-center items-center overflow-hidden;
+            min-height: 250px; /* Ensure some height even without an image */
+        }
+        .image-display-area img {
+            max-width: 100%;
+            max-height: 100%; /* Ensure image fits within its container */
+            height: auto;
+            border-radius: 8px; /* Slightly rounded corners for images */
+            object-fit: contain; /* Ensures the entire image is visible without cropping */
+        }
+        .status-message {
+            @apply text-center p-4 text-gray-600;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-xl bg-white rounded-xl shadow-2xl p-8 space-y-6">
+        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
+            Live QR Code Stream
+        </h1>
+
+        <div id="status" class="status-message text-lg font-medium">
+            Attempting to connect to WebSocket...
+        </div>
+
+        <div id="imageDisplayArea" class="image-display-area">
+            <!-- The single image will be displayed here -->
+            <img id="mainImage" src="https://placehold.co/300x300/e2e8f0/94a3b8?text=Waiting+for+QR+code..." alt="Waiting for QR code">
+        </div>
+    </div>
+
+    <script>
+        // Get references to the DOM elements
+        const imageDisplayArea = document.getElementById('imageDisplayArea');
+        const mainImage = document.getElementById('mainImage');
+        const statusElement = document.getElementById('status');
+
+        // Function to display status messages
+        function updateStatus(message, type = 'info') {
+            statusElement.textContent = message;
+            statusElement.className = 'status-message'; // Reset classes
+            if (type === 'error') {
+                statusElement.classList.add('text-red-600', 'font-bold');
+            } else if (type === 'success') {
+                statusElement.classList.add('text-green-600', 'font-bold');
+            }
+        }
+
+        // Function to get a query parameter from the URL
+        function getQueryParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Main function to initialize the WebSocket connection
+        function initializeWebSocket() {
+            const path = getQueryParam('path');
+            const wsHost = getQueryParam('ws_host'); // Parameter for file:// protocol
+
+            if (!path) {
+                updateStatus('Error: "path" parameter missing in URL. Please provide it like ?path=/ws/your_endpoint', 'error');
+                return;
+            }
+
+            let wsUrl;
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+            if (window.location.protocol === 'file:') {
+                if (!wsHost) {
+                    updateStatus('Error: When using file:// protocol, "ws_host" parameter is required (e.g., ?path=/ws/your_endpoint&ws_host=localhost:8080)', 'error');
+                    return;
+                }
+                wsUrl = `ws://${wsHost}${path}`;
+            } else {
+                // For http:// or https:// protocols, use the current host
+                wsUrl = `${wsProtocol}//${window.location.host}${path}`;
+            }
+
+            updateStatus(`Connecting to WebSocket at: ${wsUrl}`);
+
+            let ws;
+            try {
+                ws = new WebSocket(wsUrl);
+                // Set binaryType to 'arraybuffer' to receive binary data as ArrayBuffer
+                ws.binaryType = 'arraybuffer';
+            } catch (error) {
+                updateStatus(`Failed to create WebSocket: ${error.message}`, 'error');
+                return;
+            }
+
+            ws.onopen = () => {
+                updateStatus('WebSocket connected successfully!', 'success');
+                // Optionally clear the placeholder text on connection
+                mainImage.alt = 'QR code will appear here';
+            };
+
+            ws.onmessage = (event) => {
+                // Check if the received data is binary (ArrayBuffer or Blob)
+                if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // e.target.result will be the base64 encoded data URL
+                        const imageDataUrl = e.target.result;
+                        updateImage(imageDataUrl);
+                    };
+                    reader.onerror = function() {
+                        updateStatus('Error reading binary image data.', 'error');
+                    };
+                    reader.readAsDataURL(new Blob([event.data])); // Convert ArrayBuffer to Blob for FileReader
+                } else {
+                    // Assume it's already a base64 string if not binary
+                    // Prepend data:image/jpeg;base64, or data:image/png;base64, etc.
+                    // For simplicity, we'll assume JPEG or PNG. You might need to infer type.
+                    const imageDataUrl = `data:image/jpeg;base64,${event.data}`; // Adjust mime type if needed
+                    updateImage(imageDataUrl);
+                }
+            };
+
+            // Function to update the single image being displayed
+            function updateImage(src) {
+                // Set the src of the existing image element
+                mainImage.src = src;
+                mainImage.alt = 'Received QR Code';
+                // Remove any placeholder text if it was there
+                mainImage.classList.remove('animate-pulse');
+
+                // Optional: Add a subtle fade-in effect for the new image
+                mainImage.style.opacity = '0';
+                mainImage.style.transition = 'opacity 0.3s ease-in-out';
+                setTimeout(() => {
+                    mainImage.style.opacity = '1';
+                }, 10); // Small delay to trigger transition
+            }
+
+            ws.onerror = (error) => {
+                updateStatus(`WebSocket Error: ${error.message || 'Unknown error'}`, 'error');
+                console.error('WebSocket Error:', error);
+            };
+
+            ws.onclose = (event) => {
+                let reason;
+                if (event.wasClean) {
+                    reason = `Connection closed cleanly, code=${event.code}, reason=${event.reason}`;
+                } else {
+                    reason = 'Connection died unexpectedly'; // e.g. server process killed or network down
+                }
+                updateStatus(`WebSocket Closed: ${reason}. Attempting to reconnect in 5 seconds...`, 'error');
+                console.warn('WebSocket Closed:', event);
+                // Attempt to reconnect after a delay
+                setTimeout(initializeWebSocket, 5000);
+            };
+        }
+
+        // Initialize WebSocket when the window loads
+        window.onload = initializeWebSocket;
+    </script>
+</body>
+</html>

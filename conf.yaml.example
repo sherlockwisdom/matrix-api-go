@@ -15,4 +15,4 @@ bridges:
   - wa:
       botname: "@whatsappbot:relaysms.me"
       cmd:
-        login: "!wa login phone"
+        login: "!wa login qr"

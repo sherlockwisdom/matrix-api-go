@@ -148,12 +148,12 @@ func Sync(
 	client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		bridge.ChEvt <- evt
-		bridge.GetInvites(client, evt)
-		// go func() {
-		// 	bridge.ChEvt <- evt
-		// 	bridge.GetInvites(client, evt)
-		// }()
+		// bridge.ChEvt <- evt
+		// bridge.GetInvites(client, evt)
+		go func() {
+			bridge.ChEvt <- evt
+			bridge.GetInvites(client, evt)
+		}()
 	})
 
 	log.Println("Syncing...")

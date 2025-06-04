@@ -290,6 +290,7 @@ func ApiAddDevice(c *gin.Context) {
 		if err != nil {
 			log.Println("Failed to start websocket:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start websocket"})
+			defer wg.Done()
 			return
 		}
 	}()
