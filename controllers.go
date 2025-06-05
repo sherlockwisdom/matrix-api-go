@@ -23,7 +23,7 @@ var ks = Keystore{
 }
 
 var syncingClients = SyncingClients{
-	Bridge:   make(map[string]*Bridges),
+	Bridge:   make(map[string][]*Bridges),
 	Registry: make(map[string]bool),
 }
 

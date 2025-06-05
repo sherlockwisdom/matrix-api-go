@@ -91,11 +91,13 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer func() {
-		if index := GetWebsocketIndex(wd.Bridge.Client.UserID.Localpart(), wd.Bridge.Name); index > -1 {
-			GlobalWebsocketConnection.Registry =
-				slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-			log.Println("Deleting websocket map at", index)
-		}
+		// if index := GetWebsocketIndex(wd.Bridge.Client.UserID.Localpart(), wd.Bridge.Name); index > -1 {
+		// 	GlobalWebsocketConnection.Registry =
+		// 		slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
+		// 	log.Println("Deleting websocket map at", index)
+		// }
+		log.Println("Falsifying syncing clients for user:", wd.Bridge.Client.UserID.Localpart())
+		syncingClients.Registry[wd.Bridge.Client.UserID.Localpart()] = false
 	}()
 
 	wg.Wait()
@@ -105,6 +107,13 @@ func (wd *WebsocketData) RegisterWebsocket(platformName string, username string)
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 	if index := GetWebsocketIndex(username, platformName); index > -1 {
 		log.Println("[+] Incoming socket connection but one already exist", wd.Bridge.Client.UserID)
+
+		if !syncingClients.Registry[wd.Bridge.Client.UserID.Localpart()] {
+			delete(syncingClients.Bridge, wd.Bridge.Client.UserID.Localpart())
+			log.Println("Deleting syncing clients for user:", wd.Bridge.Client.UserID.Localpart())
+			return
+		}
+
 		GlobalWebsocketConnection.Registry =
 			slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
 		wd.Bridge.Name = platformName

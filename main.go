@@ -379,7 +379,14 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	bridge := syncingClients.Bridge[username]
+	var bridge *Bridges
+	for _, _bridge := range syncingClients.Bridge[username] {
+		log.Println("[Add Device] Checking Bridge for user:", username, _bridge.Name)
+		if _bridge.Name == platformName {
+			bridge = _bridge
+			break
+		}
+	}
 
 	if bridge == nil {
 		log.Println("Bridge not found for user:", username)
@@ -463,24 +470,10 @@ func CliFlow() {
 	CompleteRun(client, &bridge)
 }
 
-// @title           Swagger Example API
-// @version         2.0
-// @description     This is a sample server celler server.
-// @termsOfService  http://swagger.io/terms/
-
-// @contact.name   API Support
-// @contact.url    http://www.swagger.io/support
-// @contact.email  support@swagger.io
-
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
-
+// @title           ShortMesh API
+// @version         1.0
+// @description     ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.
 // @host      localhost:8080
-
-// @securityDefinitions.basic  BasicAuth
-
-// @externalDocs.description  OpenAPI
-// @externalDocs.url          https://swagger.io/resources/open-api/
 func main() {
 	if cfgError != nil {
 		panic(cfgError)

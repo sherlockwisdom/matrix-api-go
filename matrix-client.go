@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -13,7 +14,7 @@ import (
 )
 
 type SyncingClients struct {
-	Bridge   map[string]*Bridges
+	Bridge   map[string][]*Bridges
 	Registry map[string]bool
 }
 
@@ -256,27 +257,40 @@ func SyncAllClients() error {
 					return
 				}
 
-				bridge := Bridges{
-					ChEvt:   make(chan *event.Event, 1),
-					ChImage: make(chan []byte, 1),
-					Room: Rooms{
-						User: Users{Username: user.Username},
-					},
-					Client: client,
+				var clientDB ClientDB = ClientDB{
+					username: user.Username,
+					filepath: "db/" + user.Username + ".db",
+				}
+				clientDB.Init()
+
+				bridges, err := clientDB.FetchBridgeRooms(user.Username)
+				if err != nil {
+					log.Println("Error fetching bridge rooms for user:", err, user.Username)
+					return
 				}
 
-				syncingClients.Bridge[user.Username] = &bridge
 				syncingClients.Registry[user.Username] = true
-
-				err = Sync(client, &bridge)
-				if err != nil {
-					log.Println("Sync error for user:", err, client.UserID.String())
+				wg := sync.WaitGroup{}
+				for _, bridge := range bridges {
+					wg.Add(1)
+					bridge.Client = client
+					go func(user Users) {
+						log.Println("Syncing bridge for user:", user.Username, bridge.Room.ID)
+						syncingClients.Bridge[user.Username] = append(syncingClients.Bridge[user.Username], &bridge)
+						err = Sync(client, &bridge)
+						if err != nil {
+							log.Println("Sync error for user:", err, client.UserID.String())
+						}
+						wg.Done()
+					}(user)
 				}
 
 				defer func() {
 					delete(syncingClients.Registry, user.Username)
 					delete(syncingClients.Bridge, user.Username)
+					log.Println("Deleted syncing for user:", user.Username)
 				}()
+				wg.Wait()
 			}(user)
 			time.Sleep(3 * time.Second)
 		}

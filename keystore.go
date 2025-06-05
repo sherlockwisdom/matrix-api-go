@@ -328,3 +328,54 @@ func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
 
 	return room, err
 }
+
+func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
+	log.Println("Fetching bridge rooms for", username, clientDb.filepath)
+	stmt, err := clientDb.connection.Prepare(
+		"select clientUsername, roomID, name, members, type, isBridge from rooms where clientUsername = ? and isBridge = 1",
+	)
+	if err != nil {
+		return []Bridges{}, err
+	}
+
+	defer stmt.Close()
+
+	rows, err := stmt.Query(username)
+	if err != nil {
+		return []Bridges{}, err
+	}
+
+	defer rows.Close()
+
+	var rooms = []Bridges{}
+	for rows.Next() {
+		var clientUsername string
+		var _roomID string
+		var name string
+		var members string
+		var _type int
+		var isBridge bool
+
+		err = rows.Scan(&clientUsername, &_roomID, &name, &members, &_type, &isBridge)
+		if err != nil {
+			return []Bridges{}, err
+		}
+
+		rooms = append(rooms, Bridges{
+			ChEvt:   make(chan *event.Event, 1),
+			ChImage: make(chan []byte, 1),
+			Room: Rooms{
+				ID:       id.RoomID(_roomID),
+				Channel:  make(chan *event.Event),
+				Type:     RoomType(_type),
+				isBridge: isBridge,
+				Members: map[string]string{
+					name: members,
+				},
+			},
+			Name: name,
+		})
+	}
+
+	return rooms, err
+}

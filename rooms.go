@@ -256,9 +256,6 @@ func (r *Rooms) IsBridgeInviteForContact(evt *event.Event) (bool, error) {
 }
 
 func (r *Rooms) IsBridgeMessage(evt *event.Event) (bool, error) {
-	// check room
-	// check template
-
 	if evt.Type == event.EventMessage {
 		var clientDB ClientDB = ClientDB{
 			username: r.User.Username,

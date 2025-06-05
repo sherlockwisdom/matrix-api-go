@@ -41,8 +41,8 @@ func (b *Bridges) AddDevice(
 	log.Println("Getting configs for:", b.Name)
 	if cfg, ok := conf.GetBridgeConfig(b.Name); ok {
 		var clientDb = ClientDB{
-			username: b.Room.User.Username,
-			filepath: "db/" + b.Room.User.Username + ".db",
+			username: client.UserID.Localpart(),
+			filepath: "db/" + client.UserID.Localpart() + ".db",
 		}
 
 		if err := clientDb.Init(); err != nil {
@@ -56,12 +56,6 @@ func (b *Bridges) AddDevice(
 		log.Println("Room:", room)
 
 		b.Room = room
-
-		// go func() {
-		// 	if err := Sync(client, b); err != nil {
-		// 		log.Println("Error with syncing", err)
-		// 	}
-		// }()
 
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
 			go func() {

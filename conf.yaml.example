@@ -12,7 +12,7 @@ bridges:
       botname: "@signalbot:relaysms.me"
       cmd:
         login: "!signal login"
-        failed: ""
+        failed: "Login failed: too many QR code refreshes"
 
   - wa:
       botname: "@whatsappbot:relaysms.me"
