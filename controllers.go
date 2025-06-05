@@ -13,6 +13,20 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+var cfg, cfgError = (&Conf{}).getConf()
+var GlobalWebsocketConnection = WebsocketData{
+	ch: make(chan []byte, 500),
+}
+
+var ks = Keystore{
+	filepath: cfg.KeystoreFilepath,
+}
+
+var syncingClients = SyncingClients{
+	Bridge:   make(map[string]*Bridges),
+	Registry: make(map[string]bool),
+}
+
 func JoinRooms(
 	client *mautrix.Client,
 	bridge *Bridges,
@@ -25,7 +39,7 @@ func JoinRooms(
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
 			log.Println("[+] Creating room for:", name, config.BotName)
-			bridge.Room.User.name = username
+			bridge.Room.User.Username = username
 			roomId, err := bridge.Room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
 			if err != nil {
 				return err
@@ -69,7 +83,7 @@ func LoginProcess(
 		}
 	}
 	client.UserID = id.UserID("@" + username + ":relaysms.me")
-	bridge.Room.User.name = username
+	bridge.Room.User.Username = username
 
 	JoinRooms(client, bridge, username)
 

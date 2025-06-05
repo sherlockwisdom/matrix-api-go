@@ -10,8 +10,110 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-// https://github.com/mattn/go-sqlite3/blob/v1.14.28/_example/simple/simple.go
+type Keystore struct {
+	connection *sql.DB
+	filepath   string
+}
 
+func (ks *Keystore) Init() {
+	db, err := sql.Open("sqlite3", ks.filepath)
+	if err != nil {
+		panic(err)
+	}
+	ks.connection = db
+
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS users ( 
+		id INTEGER PRIMARY KEY AUTOINCREMENT, 
+		username TEXT NOT NULL, 
+		accessToken TEXT NOT NULL,
+		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`)
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (ks *Keystore) CreateUser(username string, accessToken string) error {
+	tx, err := ks.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO users (username, accessToken) values(?,?)`)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(username, accessToken)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ks *Keystore) FetchUser(username string) (Users, error) {
+	stmt, err := ks.connection.Prepare("select id, username, accessToken from users where username = ?")
+	if err != nil {
+		return Users{}, err
+	}
+
+	defer stmt.Close()
+
+	var id int
+	var _username string
+	var _accessToken string
+	err = stmt.QueryRow(username).Scan(&id, &_username, &_accessToken)
+	if err != nil {
+		return Users{}, err
+	}
+
+	return Users{ID: id, Username: _username, AccessToken: _accessToken}, nil
+}
+
+func (ks *Keystore) FetchAllUsers() ([]Users, error) {
+	stmt, err := ks.connection.Prepare("select id, username, accessToken from users")
+	if err != nil {
+		return []Users{}, err
+	}
+
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
+	if err != nil {
+		return []Users{}, err
+	}
+
+	defer rows.Close()
+
+	var users []Users
+	for rows.Next() {
+		var id int
+		var _username string
+		var _accessToken string
+
+		err = rows.Scan(&id, &_username, &_accessToken)
+		if err != nil {
+			return []Users{}, err
+		}
+
+		users = append(users, Users{ID: id, Username: _username, AccessToken: _accessToken})
+	}
+
+	return users, nil
+}
+
+// https://github.com/mattn/go-sqlite3/blob/v1.14.28/_example/simple/simple.go
 func (clientDb *ClientDB) Init() error {
 	db, err := sql.Open("sqlite3", clientDb.filepath)
 	if err != nil {
@@ -119,12 +221,12 @@ func (clientDb *ClientDB) Close() {
 
 func (clientDb *ClientDB) StoreRooms(
 	roomID string,
-	name string,
+	platformName string,
 	members string,
 	_type int,
 	isBridge bool,
 ) error {
-	log.Println("[+] Storing to rooms:", roomID)
+	log.Println("[+] Storing to rooms:", roomID, platformName, members, _type, isBridge)
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err
@@ -139,7 +241,7 @@ func (clientDb *ClientDB) StoreRooms(
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(clientDb.username, roomID, name, members, _type, isBridge)
+	_, err = stmt.Exec(clientDb.username, roomID, platformName, members, _type, isBridge)
 	if err != nil {
 		return err
 	}

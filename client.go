@@ -5,10 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 )
+
+type SyncingClients struct {
+	Bridge   map[string]*Bridges
+	Registry map[string]bool
+}
 
 type ClientDB struct {
 	connection *sql.DB
@@ -157,11 +164,11 @@ func Sync(
 
 	log.Println("Syncing...")
 
-	for {
-		if err := client.Sync(); err != nil {
-			return err
-		}
+	if err := client.Sync(); err != nil {
+		log.Println("Sync error for user:", err, client.UserID.String())
+		return err
 	}
+	return nil
 }
 
 func (b *Bridges) GetInvites(
@@ -176,7 +183,68 @@ func (b *Bridges) GetInvites(
 			if err != nil {
 				return err
 			}
+
+			if isBridge, err := b.Room.IsBridgeInviteForContact(evt); isBridge {
+				log.Println("Bridge message handled -", evt.RoomID)
+				log.Println(err)
+
+				var clientDB ClientDB = ClientDB{
+					username: b.Room.User.Username,
+					filepath: "db/" + b.Room.User.Username + ".db",
+				}
+
+				roomName := evt.Content.AsMember().Displayname
+
+				clientDB.Init()
+				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, roomTypes.Contact.Parse(), false)
+			}
 		}
 	}
 	return nil
+}
+
+func SyncAllClients() error {
+	for {
+		users, err := ks.FetchAllUsers()
+
+		if err != nil {
+			return err
+		}
+
+		// TODO: make this multi-threaded
+		for _, user := range users {
+			if syncingClients.Registry[user.Username] {
+				continue
+			}
+
+			go func(user Users) {
+				homeServer := cfg.HomeServer
+				client, err := mautrix.NewClient(homeServer, id.NewUserID(user.Username, cfg.HomeServerDomain), user.AccessToken)
+				if err != nil {
+					log.Println("Error creating bridge for user:", err, user.Username)
+					return
+				}
+
+				bridge := Bridges{
+					ChEvt:   make(chan *event.Event, 1),
+					ChImage: make(chan []byte, 1),
+					Room: Rooms{
+						User: Users{Username: user.Username},
+					},
+					Client: client,
+				}
+
+				syncingClients.Bridge[user.Username] = &bridge
+				syncingClients.Registry[user.Username] = true
+
+				err = Sync(client, &bridge)
+				if err != nil {
+					log.Println("Sync error for user:", err, client.UserID.String())
+				}
+				syncingClients.Registry[user.Username] = false
+			}(user)
+		}
+		time.Sleep(3 * time.Second)
+		log.Printf("Syncing %d clients", len(syncingClients.Bridge))
+	}
 }

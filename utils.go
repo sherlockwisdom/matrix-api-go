@@ -24,6 +24,7 @@ type Server struct {
 
 type Conf struct {
 	Server           Server                    `yaml:"server"`
+	KeystoreFilepath string                    `yaml:"keystore_filepath"`
 	HomeServer       string                    `yaml:"homeserver"`
 	HomeServerDomain string                    `yaml:"homeserver_domain"`
 	Bridges          []map[string]BridgeConfig `yaml:"bridges"`

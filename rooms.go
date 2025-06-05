@@ -15,10 +15,12 @@ var roomTypes = NewRoomTypesRegistry()
 
 func NewRoomTypesRegistry() *RoomTypes {
 	management := RoomType{0}
+	contact := RoomType{1}
 
 	return &RoomTypes{
 		Management: management,
-		types:      []*RoomType{&management},
+		Contact:    contact,
+		types:      []*RoomType{&management, &contact},
 	}
 }
 
@@ -33,6 +35,7 @@ func (r *RoomType) Parse() int {
 
 type RoomTypes struct {
 	Management RoomType
+	Contact    RoomType
 
 	types []*RoomType
 }
@@ -173,10 +176,9 @@ func (r *Rooms) GetRoomMessages(
 	log.Println("[+] Getting messages for: ", r.ID)
 	for evt := range r.Channel {
 		if evt.Type == event.EventMessage && r.ID == evt.RoomID {
-
 			userProfile, _ := client.GetProfile(context.Background(), evt.Sender)
 
-			if isHandled, _ := r.HandleMessage(evt); isHandled {
+			if isHandled, _ := r.IsBridgeMessage(evt); isHandled {
 				return
 			}
 
@@ -226,8 +228,8 @@ func (r *Rooms) CreateRoom(
 	r.Type = _type
 
 	var clientDB ClientDB = ClientDB{
-		username: r.User.name,
-		filepath: "db/" + r.User.name + ".db",
+		username: r.User.Username,
+		filepath: "db/" + r.User.Username + ".db",
 	}
 
 	clientDB.Init()
@@ -262,14 +264,31 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 	return client.DownloadBytes(context.Background(), contentUrl)
 }
 
-func (r *Rooms) HandleMessage(evt *event.Event) (bool, error) {
+func (r *Rooms) IsBridgeInviteForContact(evt *event.Event) (bool, error) {
+	// TODO: check if the invite is from a bridge bot but not a bridge room
+	for _, bridge := range cfg.Bridges {
+		for _, bridgeCfg := range bridge {
+			if bridgeCfg.BotName == evt.Sender.String() {
+				isBridge, err := r.IsBridgeMessage(evt)
+				if err != nil {
+					return false, err
+				}
+				return !isBridge, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (r *Rooms) IsBridgeMessage(evt *event.Event) (bool, error) {
 	// check room
 	// check template
 
 	if evt.Type == event.EventMessage {
 		var clientDB ClientDB = ClientDB{
-			username: r.User.name,
-			filepath: "db/" + r.User.name + ".db",
+			username: r.User.Username,
+			filepath: "db/" + r.User.Username + ".db",
 		}
 
 		clientDB.Init()
@@ -285,9 +304,6 @@ func (r *Rooms) HandleMessage(evt *event.Event) (bool, error) {
 			return false, nil
 		}
 
-		// log.Println("[+] BRIDGE| New message:", evt.Content.AsMessage().Body)
-		// log.Println(evt.Content.Raw)
-		log.Printf("Bridge message - %v", evt.Content.Raw)
 		return true, nil
 	}
 	return false, nil

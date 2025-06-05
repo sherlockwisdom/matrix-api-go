@@ -16,19 +16,17 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/id"
+	// "maunium.net/go/mautrix/id"
 )
-
-var GlobalWebsocketConnection = WebsocketData{
-	ch: make(chan []byte, 500),
-}
 
 // Users represents a user entity
 // @Description Represents a user structure with a name
 // @name Users
 // @type object
 type Users struct {
-	name string
+	Username    string `json:"username"`
+	ID          int    `json:"id"`
+	AccessToken string `json:"access_token"`
 }
 
 // ClientJsonRequest represents login or registration data
@@ -82,7 +80,6 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	cfg, _ := (&Conf{}).getConf()
 	homeServer := cfg.HomeServer
 
 	client, err := mautrix.NewClient(homeServer, "", "")
@@ -95,7 +92,7 @@ func ApiLogin(c *gin.Context) {
 	var bridge = Bridges{
 		ChEvt: make(chan *event.Event),
 		Room: Rooms{
-			User: Users{name: clientJsonRequest.Username},
+			User: Users{Username: clientJsonRequest.Username},
 		},
 	}
 
@@ -137,7 +134,6 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	cfg, _ := (&Conf{}).getConf()
 	homeServer := cfg.HomeServer
 
 	client, err := mautrix.NewClient(homeServer, "", "")
@@ -150,7 +146,7 @@ func ApiCreate(c *gin.Context) {
 	var bridge = Bridges{
 		ChEvt: make(chan *event.Event),
 		Room: Rooms{
-			User: Users{name: clientJsonRequest.Username},
+			User: Users{Username: clientJsonRequest.Username},
 		},
 	}
 
@@ -171,18 +167,18 @@ func ApiCreate(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   platform path string true "Platform Name"
-// @Param   roomid path string true "Room ID"
+// @Param   contact path string true "Contact ID"
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /{platform}/message/{roomid} [post]
+// @Router /{platform}/message/{contact} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
-	roomID := c.Param("roomid")
+	contactID := c.Param("contact")
 
-	if roomID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing room ID"})
+	if contactID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing contact ID"})
 		return
 	}
 
@@ -208,7 +204,7 @@ func ApiSendMessage(c *gin.Context) {
 	}
 
 	room := Rooms{
-		ID: id.RoomID(roomID),
+		// ID: id.RoomID(roomID),
 	}
 
 	resp, err := room.SendRoomMessages(client, req.Message)
@@ -219,7 +215,7 @@ func ApiSendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"room_id":  roomID,
+		"contact":  contactID,
 		"event_id": resp.EventID,
 		"message":  req.Message,
 		"status":   "sent",
@@ -247,35 +243,16 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	cfg, _ := (&Conf{}).getConf()
-	homeServer := cfg.HomeServer
-
-	client, err := mautrix.NewClient(
-		homeServer,
-		// id.UserID(fmt.Sprintf("@%s:%s", bridgeJsonRequest.Username, cfg.HomeServerDomain)),
-		id.NewUserID(bridgeJsonRequest.Username, cfg.HomeServerDomain),
-		bridgeJsonRequest.AccessToken,
-	)
-
-	bridge := Bridges{
-		ChEvt:   make(chan *event.Event, 1),
-		ChImage: make(chan []byte, 1),
-		Name:    platformName,
-		Room: Rooms{
-			User: Users{bridgeJsonRequest.Username},
-		},
-		Client: client,
-	}
-
-	if err != nil {
-		log.Printf("Failed to create Matrix client: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create Matrix client"})
+	bridge := syncingClients.Bridge[bridgeJsonRequest.Username]
+	if bridge == nil {
+		log.Println("Bridge not found for user:", bridgeJsonRequest.Username)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bridge not found"})
 		return
 	}
 
 	var websocket = WebsocketData{
 		ch:     make(chan []byte, 1),
-		Bridge: &bridge,
+		Bridge: bridge,
 	}
 
 	websocket.RegisterWebsocket(platformName, bridgeJsonRequest.Username)
@@ -292,6 +269,47 @@ func ApiAddDevice(c *gin.Context) {
 	}()
 
 	wg.Wait()
+}
+
+func CliFlow() {
+	homeServer := cfg.HomeServer
+	password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
+
+	client, err := mautrix.NewClient(homeServer, "", "")
+	if err != nil {
+		panic(err)
+	}
+
+	var bridge = Bridges{
+		ChEvt: make(chan *event.Event, 500),
+	}
+	switch os.Args[1] {
+	case "--create":
+		username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+		err := CreateProcess(
+			client,
+			&bridge,
+			username,
+			password,
+		)
+
+		if err != nil {
+			panic(err)
+		}
+	case "--login":
+		username := os.Args[2]
+		LoginProcess(client, &bridge, username, password)
+	case "--websocket":
+		var wd = WebsocketData{ch: make(chan []byte, 1)}
+		wd.ch <- []byte("may the force!")
+		err := wd.MainWebsocket(false)
+		if err != nil {
+			panic(err)
+		}
+		os.Exit(0)
+	default:
+	}
+	CompleteRun(client, &bridge)
 }
 
 // @title           Swagger Example API
@@ -313,70 +331,36 @@ func ApiAddDevice(c *gin.Context) {
 // @externalDocs.description  OpenAPI
 // @externalDocs.url          https://swagger.io/resources/open-api/
 func main() {
+	if cfgError != nil {
+		panic(cfgError)
+	}
+
 	if len(os.Args) > 1 {
-		cfg, _ := (&Conf{}).getConf()
-		homeServer := cfg.HomeServer
-		password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
-
-		client, err := mautrix.NewClient(homeServer, "", "")
-		if err != nil {
-			panic(err)
-		}
-
-		var bridge = Bridges{
-			ChEvt: make(chan *event.Event, 500),
-		}
-		switch os.Args[1] {
-		case "--create":
-			username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
-			err := CreateProcess(
-				client,
-				&bridge,
-				username,
-				password,
-			)
-
-			if err != nil {
-				panic(err)
-			}
-		case "--login":
-			username := os.Args[2]
-			LoginProcess(client, &bridge, username, password)
-		case "--websocket":
-			var wd = WebsocketData{ch: make(chan []byte, 1)}
-			wd.ch <- []byte("may the force!")
-			err := wd.MainWebsocket(false)
-			if err != nil {
-				panic(err)
-			}
-			os.Exit(0)
-		default:
-		}
-		CompleteRun(client, &bridge)
+		CliFlow()
 	}
 
 	router := gin.Default()
 	router.POST("/", ApiCreate)
 	router.POST("/login", ApiLogin)
-	router.POST("/:platform/message/:roomid", ApiSendMessage)
+	router.POST("/:platform/message/:contact", ApiSendMessage)
 	router.POST("/:platform/devices/", ApiAddDevice)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	cfg, err := (&Conf{}).getConf()
-	if err != nil {
-		panic(err)
-	}
+	ks.Init()
 
 	host := cfg.Server.Host
 	port := cfg.Server.Port
-	if cfg.Server.Tls.Crt != "" && cfg.Server.Tls.Key != "" {
+	tlsCert := cfg.Server.Tls.Crt
+	tlsKey := cfg.Server.Tls.Key
+
+	if tlsCert != "" && tlsKey != "" {
 		go func() {
 			err := GlobalWebsocketConnection.MainWebsocket(true)
 			if err != nil {
 				panic(err)
 			}
 		}()
-		router.RunTLS(fmt.Sprintf(":%s", port), cfg.Server.Tls.Crt, cfg.Server.Tls.Key)
+		router.RunTLS(fmt.Sprintf(":%s", port), tlsCert, tlsKey)
 		return
 	}
 
@@ -386,5 +370,13 @@ func main() {
 			panic(err)
 		}
 	}()
+
+	go func() {
+		err := SyncAllClients()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	router.Run(fmt.Sprintf("%s:%s", host, port))
 }
