@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,14 +58,82 @@ type ClientBridgeJsonRequest struct {
 	AccessToken string `json:"access_token"`
 }
 
+// Input validation functions
+func sanitizeUsername(username string) (string, error) {
+	// Remove any whitespace
+	username = strings.TrimSpace(username)
+
+	// Username should be 3-32 characters and contain only letters, numbers, and underscores
+	validUsername := regexp.MustCompile(`^[a-zA-Z0-9_]{3,32}$`)
+	if !validUsername.MatchString(username) {
+		return "", fmt.Errorf("username must be 3-32 characters and contain only letters, numbers, and underscores")
+	}
+
+	return username, nil
+}
+
+func sanitizePassword(password string) (string, error) {
+	// Remove any whitespace
+	password = strings.TrimSpace(password)
+
+	// Password should be at least 7 characters
+	if len(password) < 7 {
+		return "", fmt.Errorf("password must be at least 7 characters long")
+	}
+
+	return password, nil
+}
+
+func sanitizeMessage(message string) (string, error) {
+	// Remove any whitespace
+	message = strings.TrimSpace(message)
+
+	// Message should not be empty and have a reasonable length
+	if len(message) == 0 {
+		return "", fmt.Errorf("message cannot be empty")
+	}
+	if len(message) > 4096 {
+		return "", fmt.Errorf("message is too long (max 4096 characters)")
+	}
+
+	return message, nil
+}
+
+func sanitizePlatform(platform string) (string, error) {
+	// Remove any whitespace and convert to lowercase
+	platform = strings.ToLower(strings.TrimSpace(platform))
+
+	// Platform should be 2-20 characters and contain only letters and numbers
+	validPlatform := regexp.MustCompile(`^[a-z0-9]{2,20}$`)
+	if !validPlatform.MatchString(platform) {
+		return "", fmt.Errorf("platform name must be 2-20 characters and contain only letters and numbers")
+	}
+
+	return platform, nil
+}
+
+func sanitizeContact(contact string) (string, error) {
+	// Remove any whitespace
+	contact = strings.TrimSpace(contact)
+
+	// E.164 format validation: +[country code][number], total length 8-15 digits
+	validContact := regexp.MustCompile(`^\+[1-9]\d{7,14}$`)
+	if !validContact.MatchString(contact) {
+		return "", fmt.Errorf("contact must be a valid E.164 phone number (e.g., +1234567890)")
+	}
+
+	return contact, nil
+}
+
 // ApiLogin godoc
 // @Summary Logs a user into the Matrix server
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "Login Credentials"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 401 {object} map[string]string
+// @Success 200 {object} map[string]string{username=string,access_token=string,status=string} "Successfully logged in"
+// @Failure 400 {object} map[string]string{error=string} "Invalid request"
+// @Failure 401 {object} map[string]string{error=string,details=string} "Login failed"
+// @Failure 500 {object} map[string]string{error=string} "Internal server error"
 // @Router /login [post]
 func ApiLogin(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
@@ -74,9 +144,16 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	if clientJsonRequest.Username == "" || clientJsonRequest.Password == "" {
-		log.Println("Missing username or password in request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username and password are required"})
+	// Sanitize inputs
+	username, err := sanitizeUsername(clientJsonRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	password, err := sanitizePassword(clientJsonRequest.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -92,18 +169,18 @@ func ApiLogin(c *gin.Context) {
 	var bridge = Bridges{
 		ChEvt: make(chan *event.Event),
 		Room: Rooms{
-			User: Users{Username: clientJsonRequest.Username},
+			User: Users{Username: username},
 		},
 	}
 
-	if err := LoginProcess(client, &bridge, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
-		log.Printf("Login failed for %s: %v", clientJsonRequest.Username, err)
+	if err := LoginProcess(client, &bridge, username, password); err != nil {
+		log.Printf("Login failed for %s: %v", username, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Login failed", "details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"username":     clientJsonRequest.Username,
+		"username":     username,
 		"access_token": client.AccessToken,
 		"status":       "logged in",
 	})
@@ -114,9 +191,10 @@ func ApiLogin(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "User Registration"
-// @Success 201 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 409 {object} map[string]string
+// @Success 201 {object} map[string]string{username=string,access_token=string,status=string} "Successfully created user"
+// @Failure 400 {object} map[string]string{error=string} "Invalid request"
+// @Failure 409 {object} map[string]string{error=string,details=string} "User creation failed"
+// @Failure 500 {object} map[string]string{error=string} "Internal server error"
 // @Router / [post]
 func ApiCreate(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
@@ -127,10 +205,16 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	// Check that required fields are not empty
-	if clientJsonRequest.Username == "" || clientJsonRequest.Password == "" {
-		log.Println("Missing username or password in request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username and password are required"})
+	// Sanitize inputs
+	username, err := sanitizeUsername(clientJsonRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	password, err := sanitizePassword(clientJsonRequest.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -146,19 +230,20 @@ func ApiCreate(c *gin.Context) {
 	var bridge = Bridges{
 		ChEvt: make(chan *event.Event),
 		Room: Rooms{
-			User: Users{Username: clientJsonRequest.Username},
+			User: Users{Username: username},
 		},
 	}
 
-	if err := CreateProcess(client, &bridge, clientJsonRequest.Username, clientJsonRequest.Password); err != nil {
-		log.Printf("User creation failed for %s: %v", clientJsonRequest.Username, err)
+	if err := CreateProcess(client, &bridge, username, password); err != nil {
+		log.Printf("User creation failed for %s: %v\n", username, err)
 		c.JSON(http.StatusConflict, gin.H{"error": "User creation failed", "details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"username": clientJsonRequest.Username,
-		"status":   "created",
+		"username":     username,
+		"access_token": client.AccessToken,
+		"status":       "created",
 	})
 }
 
@@ -167,18 +252,25 @@ func ApiCreate(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   platform path string true "Platform Name"
-// @Param   contact path string true "Contact ID"
+// @Param   contact path string true "Contact ID (E.164 phone number)"
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} map[string]string{contact=string,event_id=string,message=string,status=string} "Message sent successfully"
+// @Failure 400 {object} map[string]string{error=string} "Invalid request"
+// @Failure 500 {object} map[string]string{error=string} "Failed to send message"
 // @Router /{platform}/message/{contact} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
-	contactID := c.Param("contact")
 
-	if contactID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing contact ID"})
+	// Sanitize platform and contact parameters
+	_, err := sanitizePlatform(c.Param("platform"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	contactID, err := sanitizeContact(c.Param("contact"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -188,8 +280,10 @@ func ApiSendMessage(c *gin.Context) {
 		return
 	}
 
-	if req.Message == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Message body cannot be empty"})
+	// Sanitize message
+	message, err := sanitizeMessage(req.Message)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -203,11 +297,9 @@ func ApiSendMessage(c *gin.Context) {
 		return
 	}
 
-	room := Rooms{
-		// ID: id.RoomID(roomID),
-	}
+	room := Rooms{}
 
-	resp, err := room.SendRoomMessages(client, req.Message)
+	resp, err := room.SendRoomMessages(client, message)
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
@@ -217,7 +309,7 @@ func ApiSendMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"contact":  contactID,
 		"event_id": resp.EventID,
-		"message":  req.Message,
+		"message":  message,
 		"status":   "sent",
 	})
 }
@@ -228,14 +320,20 @@ func ApiSendMessage(c *gin.Context) {
 // @Produce  json
 // @Param   platform path string true "Platform Name"
 // @Param   payload body ClientBridgeJsonRequest true "Bridge Payload"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Success 200 {object} map[string]string{websocket_url=string} "Successfully added device"
+// @Failure 400 {object} map[string]string{error=string} "Invalid request"
+// @Failure 404 {object} map[string]string{error=string} "Bridge not found"
+// @Failure 500 {object} map[string]string{error=string} "Internal server error"
 // @Router /{platform}/devices/ [post]
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
-	platformName := c.Param("platform")
-	log.Println("API request platform name:", platformName)
+
+	// Sanitize platform parameter
+	platformName, err := sanitizePlatform(c.Param("platform"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	if err := c.ShouldBindJSON(&bridgeJsonRequest); err != nil {
 		log.Printf("Invalid request payload: %v", err)
@@ -243,9 +341,16 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	bridge := syncingClients.Bridge[bridgeJsonRequest.Username]
+	// Sanitize username
+	username, err := sanitizeUsername(bridgeJsonRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	bridge := syncingClients.Bridge[username]
 	if bridge == nil {
-		log.Println("Bridge not found for user:", bridgeJsonRequest.Username)
+		log.Println("Bridge not found for user:", username)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Bridge not found"})
 		return
 	}
@@ -255,7 +360,7 @@ func ApiAddDevice(c *gin.Context) {
 		Bridge: bridge,
 	}
 
-	websocket.RegisterWebsocket(platformName, bridgeJsonRequest.Username)
+	websocket.RegisterWebsocket(platformName, username)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -340,6 +445,22 @@ func main() {
 	}
 
 	router := gin.Default()
+
+	// Add CORS middleware
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	router.POST("/", ApiCreate)
 	router.POST("/login", ApiLogin)
 	router.POST("/:platform/message/:contact", ApiSendMessage)

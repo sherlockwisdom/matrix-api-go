@@ -23,6 +23,29 @@ type ClientDB struct {
 	filepath   string
 }
 
+func ProcessActiveSessions(client *mautrix.Client, username string, password string, accessToken string) error {
+	client.AccessToken = accessToken
+
+	err := ks.CreateUser(username, client.AccessToken)
+	if err != nil {
+		return err
+	}
+
+	var clientDB ClientDB = ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+
+	err = clientDB.Store(client.AccessToken, password)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func LoadActiveSessions(
 	client *mautrix.Client,
 	username string,
@@ -50,9 +73,12 @@ func LoadActiveSessions(
 		panic(err)
 	}
 
-	client.AccessToken = accessToken
-
 	fmt.Printf("Found access token: %v\n", accessToken)
+
+	err = ProcessActiveSessions(client, username, password, accessToken)
+	if err != nil {
+		return "", err
+	}
 
 	return accessToken, nil
 }
@@ -81,10 +107,7 @@ func Login(client *mautrix.Client, username string, password string) (string, er
 		return "", err
 	}
 
-	client.AccessToken = resp.AccessToken
-
-	err = clientDB.Store(client.AccessToken, password)
-
+	err = ProcessActiveSessions(client, username, password, resp.AccessToken)
 	if err != nil {
 		return "", err
 	}
@@ -108,14 +131,13 @@ func Logout(client *mautrix.Client) error {
 func Create(client *mautrix.Client, username string, password string) (string, error) {
 	fmt.Printf("[+] Creating user: %s\n", username)
 
-	available, err := client.RegisterAvailable(context.Background(), username)
+	_, err := client.RegisterAvailable(context.Background(), username)
 	if err != nil {
-		log.Fatalf("Username availability check failed: %v", err)
 		return "", err
 	}
-	if !available.Available {
-		log.Fatalf("Username '%s' is already taken", username)
-	}
+	// if !available.Available {
+	// 	log.Fatalf("Username '%s' is already taken", username)
+	// }
 
 	resp, _, err := client.Register(context.Background(), &mautrix.ReqRegister{
 		Username: username,
@@ -129,17 +151,11 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 		return resp.AccessToken, err
 	}
 
-	var clientDB ClientDB = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-
 	client.AccessToken = resp.AccessToken
 
-	clientDB.Init()
-	err = clientDB.Store(client.AccessToken, password)
+	err = ProcessActiveSessions(client, username, password, resp.AccessToken)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
@@ -161,8 +177,6 @@ func Sync(
 			bridge.GetInvites(client, evt)
 		}()
 	})
-
-	log.Println("Syncing...")
 
 	if err := client.Sync(); err != nil {
 		log.Println("Sync error for user:", err, client.UserID.String())
@@ -204,6 +218,7 @@ func (b *Bridges) GetInvites(
 }
 
 func SyncAllClients() error {
+	log.Println("Syncing all clients")
 	for {
 		users, err := ks.FetchAllUsers()
 
@@ -241,10 +256,14 @@ func SyncAllClients() error {
 				if err != nil {
 					log.Println("Sync error for user:", err, client.UserID.String())
 				}
-				syncingClients.Registry[user.Username] = false
+
+				defer func() {
+					syncingClients.Registry[user.Username] = false
+					delete(syncingClients.Bridge, user.Username)
+				}()
 			}(user)
 		}
-		time.Sleep(3 * time.Second)
 		log.Printf("Syncing %d clients", len(syncingClients.Bridge))
+		time.Sleep(3 * time.Second)
 	}
 }

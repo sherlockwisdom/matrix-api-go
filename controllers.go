@@ -32,19 +32,29 @@ func JoinRooms(
 	bridge *Bridges,
 	username string,
 ) error {
-	cfg, err := (&Conf{}).getConf()
+	clientDB := ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+
+	clientRooms, err := bridge.Room.JoinedRooms(client)
 	if err != nil {
 		return err
 	}
+	log.Println("Client Rooms: ", clientRooms)
+
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
-			log.Println("[+] Creating room for:", name, config.BotName)
-			bridge.Room.User.Username = username
-			roomId, err := bridge.Room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
-			if err != nil {
-				return err
+			if _, err := clientDB.FetchRooms(name); err != nil {
+				log.Println("[+] Creating room for:", name, config.BotName)
+				bridge.Room.User.Username = username
+				roomId, err := bridge.Room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
+				if err != nil {
+					return err
+				}
+				log.Println("[+] Created room successfully for:", config.BotName, roomId)
 			}
-			log.Println("[+] Created room successfully for:", config.BotName, roomId)
 		}
 	}
 	return nil

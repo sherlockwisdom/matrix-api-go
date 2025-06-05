@@ -46,29 +46,95 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Successfully created user",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "access_token": {
+                                                "type": "string"
+                                            },
+                                            "status": {
+                                                "type": "string"
+                                            },
+                                            "username": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "User creation failed",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "details": {
+                                                "type": "string"
+                                            },
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
@@ -97,29 +163,95 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successfully logged in",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "access_token": {
+                                                "type": "string"
+                                            },
+                                            "status": {
+                                                "type": "string"
+                                            },
+                                            "username": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Login failed",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "details": {
+                                                "type": "string"
+                                            },
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
@@ -155,36 +287,93 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successfully added device",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "websocket_url": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Bridge not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
                 }
             }
         },
-        "/{platform}/message/{roomid}": {
+        "/{platform}/message/{contact}": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -203,8 +392,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Room ID",
-                        "name": "roomid",
+                        "description": "Contact ID (E.164 phone number)",
+                        "name": "contact",
                         "in": "path",
                         "required": true
                     },
@@ -220,29 +409,74 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Message sent successfully",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "contact": {
+                                                "type": "string"
+                                            },
+                                            "event_id": {
+                                                "type": "string"
+                                            },
+                                            "message": {
+                                                "type": "string"
+                                            },
+                                            "status": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Failed to send message",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
-                                "type": "string"
+                                "allOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "error": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
                     }
