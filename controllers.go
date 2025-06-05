@@ -46,10 +46,12 @@ func JoinRooms(
 
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
-			if _, err := clientDB.FetchRooms(name); err != nil {
+			if fRoooms, err := clientDB.FetchRoomsByMembers(name); fRoooms.ID == "" && err == nil {
 				log.Println("[+] Creating room for:", name, config.BotName)
 				bridge.Room.User.Username = username
-				roomId, err := bridge.Room.CreateRoom(client, name, config.BotName, roomTypes.Management, true)
+				roomId, err := bridge.Room.CreateRoom(
+					client, name, config.BotName, RoomTypeManagement, true,
+				)
 				if err != nil {
 					return err
 				}
@@ -66,7 +68,7 @@ func CreateProcess(
 	username string,
 	password string,
 ) error {
-	_, err := Create(client, username, password)
+	_, err := Create(client, username, password, bridge)
 
 	if err != nil {
 		return err
@@ -74,8 +76,7 @@ func CreateProcess(
 
 	log.Println("[+] Created user: ", username)
 
-	JoinRooms(client, bridge, username)
-	client.UserID = id.UserID("@" + username + ":relaysms.me")
+	client.UserID = id.NewUserID(username, cfg.HomeServerDomain)
 
 	return nil
 }
@@ -86,16 +87,12 @@ func LoginProcess(
 	username string,
 	password string,
 ) error {
-	_, err := LoadActiveSessions(client, username, password)
+	_, err := LoadActiveSessions(client, username, password, bridge)
 	if err != nil {
-		if _, err = Login(client, username, password); err != nil {
+		if _, err = Login(client, username, password, bridge); err != nil {
 			return err
 		}
 	}
-	client.UserID = id.UserID("@" + username + ":relaysms.me")
-	bridge.Room.User.Username = username
-
-	JoinRooms(client, bridge, username)
 
 	return nil
 }

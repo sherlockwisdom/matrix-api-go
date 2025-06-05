@@ -11,38 +11,12 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-var roomTypes = NewRoomTypesRegistry()
+type RoomType int
 
-func NewRoomTypesRegistry() *RoomTypes {
-	management := RoomType{0}
-	contact := RoomType{1}
-
-	return &RoomTypes{
-		Management: management,
-		Contact:    contact,
-		types:      []*RoomType{&management, &contact},
-	}
-}
-
-func (r *RoomType) Parse() int {
-	for _, roomType := range roomTypes.types {
-		if roomType == r {
-			return roomType.IntValue
-		}
-	}
-	return -1
-}
-
-type RoomTypes struct {
-	Management RoomType
-	Contact    RoomType
-
-	types []*RoomType
-}
-
-type RoomType struct {
-	IntValue int
-}
+const (
+	RoomTypeManagement RoomType = iota
+	RoomTypeContact
+)
 
 type Rooms struct {
 	ID       id.RoomID
@@ -237,7 +211,7 @@ func (r *Rooms) CreateRoom(
 		r.ID.String(),
 		name,
 		members,
-		_type.Parse(),
+		int(_type),
 		isBridge,
 	); err != nil {
 		return resp.RoomID, err

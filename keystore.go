@@ -281,7 +281,7 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 	var room = Rooms{
 		ID:       id.RoomID(_roomID),
 		Channel:  make(chan *event.Event),
-		Type:     RoomType{_type},
+		Type:     RoomType(_type),
 		isBridge: isBridge,
 		Members: map[string]string{
 			name: members,
@@ -319,7 +319,7 @@ func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
 	var room = Rooms{
 		ID:       id.RoomID(_roomID),
 		Channel:  make(chan *event.Event),
-		Type:     RoomType{_type},
+		Type:     RoomType(_type),
 		isBridge: isBridge,
 		Members: map[string]string{
 			_name: members,

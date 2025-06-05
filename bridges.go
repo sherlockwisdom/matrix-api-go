@@ -38,8 +38,8 @@ func (b *Bridges) AddDevice(
 		return err
 	}
 
+	log.Println("Getting configs for:", b.Name)
 	if cfg, ok := conf.GetBridgeConfig(b.Name); ok {
-		log.Println("Getting configs for:", b.Name)
 		var clientDb = ClientDB{
 			username: b.Room.User.Username,
 			filepath: "db/" + b.Room.User.Username + ".db",

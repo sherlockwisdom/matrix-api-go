@@ -18,6 +18,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 	// "maunium.net/go/mautrix/id"
 )
 
@@ -56,6 +57,36 @@ type ClientMessageJsonRequeset struct {
 type ClientBridgeJsonRequest struct {
 	Username    string `json:"username"`
 	AccessToken string `json:"access_token"`
+}
+
+// LoginResponse represents the response for successful login
+// @Description Response payload for successful login
+type LoginResponse struct {
+	Username    string `json:"username" example:""`
+	AccessToken string `json:"access_token" example:""`
+	Status      string `json:"status" example:""`
+}
+
+// ErrorResponse represents an error response
+// @Description Response payload for error cases
+type ErrorResponse struct {
+	Error   string `json:"error" example:""`
+	Details string `json:"details,omitempty" example:""`
+}
+
+// MessageResponse represents the response for successful message sending
+// @Description Response payload for successful message sending
+type MessageResponse struct {
+	Contact string `json:"contact" example:""`
+	EventID string `json:"event_id" example:""`
+	Message string `json:"message" example:""`
+	Status  string `json:"status" example:""`
+}
+
+// DeviceResponse represents the response for successful device addition
+// @Description Response payload for successful device addition
+type DeviceResponse struct {
+	WebsocketURL string `json:"websocket_url" example:""`
 }
 
 // Input validation functions
@@ -130,10 +161,10 @@ func sanitizeContact(contact string) (string, error) {
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "Login Credentials"
-// @Success 200 {object} map[string]string{username=string,access_token=string,status=string} "Successfully logged in"
-// @Failure 400 {object} map[string]string{error=string} "Invalid request"
-// @Failure 401 {object} map[string]string{error=string,details=string} "Login failed"
-// @Failure 500 {object} map[string]string{error=string} "Internal server error"
+// @Success 200 {object} LoginResponse "Successfully logged in"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Login failed"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /login [post]
 func ApiLogin(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
@@ -191,10 +222,10 @@ func ApiLogin(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "User Registration"
-// @Success 201 {object} map[string]string{username=string,access_token=string,status=string} "Successfully created user"
-// @Failure 400 {object} map[string]string{error=string} "Invalid request"
-// @Failure 409 {object} map[string]string{error=string,details=string} "User creation failed"
-// @Failure 500 {object} map[string]string{error=string} "Internal server error"
+// @Success 201 {object} LoginResponse "Successfully created user"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 409 {object} ErrorResponse "User creation failed"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router / [post]
 func ApiCreate(c *gin.Context) {
 	var clientJsonRequest ClientJsonRequest
@@ -254,9 +285,9 @@ func ApiCreate(c *gin.Context) {
 // @Param   platform path string true "Platform Name"
 // @Param   contact path string true "Contact ID (E.164 phone number)"
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
-// @Success 200 {object} map[string]string{contact=string,event_id=string,message=string,status=string} "Message sent successfully"
-// @Failure 400 {object} map[string]string{error=string} "Invalid request"
-// @Failure 500 {object} map[string]string{error=string} "Failed to send message"
+// @Success 200 {object} MessageResponse "Message sent successfully"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 500 {object} ErrorResponse "Failed to send message"
 // @Router /{platform}/message/{contact} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
@@ -320,10 +351,10 @@ func ApiSendMessage(c *gin.Context) {
 // @Produce  json
 // @Param   platform path string true "Platform Name"
 // @Param   payload body ClientBridgeJsonRequest true "Bridge Payload"
-// @Success 200 {object} map[string]string{websocket_url=string} "Successfully added device"
-// @Failure 400 {object} map[string]string{error=string} "Invalid request"
-// @Failure 404 {object} map[string]string{error=string} "Bridge not found"
-// @Failure 500 {object} map[string]string{error=string} "Internal server error"
+// @Success 200 {object} DeviceResponse "Successfully added device"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 404 {object} ErrorResponse "Bridge not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{platform}/devices/ [post]
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
@@ -349,6 +380,7 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	bridge := syncingClients.Bridge[username]
+
 	if bridge == nil {
 		log.Println("Bridge not found for user:", username)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Bridge not found"})
@@ -359,6 +391,20 @@ func ApiAddDevice(c *gin.Context) {
 		ch:     make(chan []byte, 1),
 		Bridge: bridge,
 	}
+
+	client, err := mautrix.NewClient(
+		cfg.HomeServer,
+		id.NewUserID(username, cfg.HomeServerDomain),
+		bridgeJsonRequest.AccessToken,
+	)
+
+	if err != nil {
+		log.Printf("Failed to create Matrix client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
+		return
+	}
+
+	ProcessActiveSessions(client, username, "", "", bridge, true)
 
 	websocket.RegisterWebsocket(platformName, username)
 

@@ -38,9 +38,10 @@ type WebsocketMap struct {
 	Websocket    *WebsocketData
 }
 
-func GetWebsocketIndex(wd *WebsocketData) int {
+func GetWebsocketIndex(username string, platformName string) int {
 	for index, _wd := range GlobalWebsocketConnection.Registry {
-		if _wd.Websocket == wd {
+		if _wd.Username == username &&
+			_wd.PlatformName == platformName {
 			return index
 		}
 	}
@@ -48,6 +49,7 @@ func GetWebsocketIndex(wd *WebsocketData) int {
 }
 
 func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Websocket handler called", wd.Bridge.Client.UserID)
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
@@ -89,7 +91,7 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer func() {
-		if index := GetWebsocketIndex(wd); index > -1 {
+		if index := GetWebsocketIndex(wd.Bridge.Client.UserID.Localpart(), wd.Bridge.Name); index > -1 {
 			GlobalWebsocketConnection.Registry =
 				slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
 			log.Println("Deleting websocket map at", index)
@@ -100,17 +102,17 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (wd *WebsocketData) RegisterWebsocket(platformName string, username string) {
-	if index := GetWebsocketIndex(wd); index > -1 {
+	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
+	if index := GetWebsocketIndex(username, platformName); index > -1 {
 		log.Println("[+] Incoming socket connection but one already exist", wd.Bridge.Client.UserID)
-		/*
 		GlobalWebsocketConnection.Registry =
 			slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-		*/
-		wd = GlobalWebsocketConnection.Registry[index].Websocket
+		wd.Bridge.Name = platformName
 		log.Println("[+] Deleted socket at index", index)
+	} else {
+		http.HandleFunc(websocketUrl, wd.Handler)
+		log.Println("[+] Registered websocket", websocketUrl)
 	}
-	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
-	http.HandleFunc(websocketUrl, wd.Handler)
 	GlobalWebsocketConnection.Registry = append(GlobalWebsocketConnection.Registry, &WebsocketMap{
 		Url:          websocketUrl,
 		PlatformName: platformName,
@@ -118,7 +120,6 @@ func (wd *WebsocketData) RegisterWebsocket(platformName string, username string)
 		Websocket:    wd,
 	})
 	wd.ch <- []byte(websocketUrl)
-	log.Println("[+] Registered websocket", websocketUrl)
 }
 
 func (wd *WebsocketData) MainWebsocket(tls bool) error {

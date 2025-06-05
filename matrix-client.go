@@ -23,26 +23,36 @@ type ClientDB struct {
 	filepath   string
 }
 
-func ProcessActiveSessions(client *mautrix.Client, username string, password string, accessToken string) error {
-	client.AccessToken = accessToken
+func ProcessActiveSessions(
+	client *mautrix.Client,
+	username string,
+	password string,
+	accessToken string,
+	bridge *Bridges,
+	existing bool,
+) error {
+	if !existing {
+		client.AccessToken = accessToken
 
-	err := ks.CreateUser(username, client.AccessToken)
-	if err != nil {
-		return err
+		err := ks.CreateUser(username, client.AccessToken)
+		if err != nil {
+			return err
+		}
+
+		var clientDB ClientDB = ClientDB{
+			username: username,
+			filepath: "db/" + username + ".db",
+		}
+		clientDB.Init()
+
+		err = clientDB.Store(client.AccessToken, password)
+
+		if err != nil {
+			return err
+		}
 	}
 
-	var clientDB ClientDB = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDB.Init()
-
-	err = clientDB.Store(client.AccessToken, password)
-
-	if err != nil {
-		return err
-	}
-
+	JoinRooms(client, bridge, username)
 	return nil
 }
 
@@ -50,6 +60,7 @@ func LoadActiveSessions(
 	client *mautrix.Client,
 	username string,
 	password string,
+	bridge *Bridges,
 ) (string, error) {
 	fmt.Println("Loading active sessions: ", username, password)
 
@@ -75,7 +86,7 @@ func LoadActiveSessions(
 
 	fmt.Printf("Found access token: %v\n", accessToken)
 
-	err = ProcessActiveSessions(client, username, password, accessToken)
+	err = ProcessActiveSessions(client, username, password, accessToken, bridge, false)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +94,7 @@ func LoadActiveSessions(
 	return accessToken, nil
 }
 
-func Login(client *mautrix.Client, username string, password string) (string, error) {
+func Login(client *mautrix.Client, username string, password string, bridge *Bridges) (string, error) {
 	fmt.Printf("Login in as %s\n", username)
 
 	var clientDB ClientDB = ClientDB{
@@ -107,7 +118,7 @@ func Login(client *mautrix.Client, username string, password string) (string, er
 		return "", err
 	}
 
-	err = ProcessActiveSessions(client, username, password, resp.AccessToken)
+	err = ProcessActiveSessions(client, username, password, resp.AccessToken, bridge, false)
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +139,7 @@ func Logout(client *mautrix.Client) error {
 	return err
 }
 
-func Create(client *mautrix.Client, username string, password string) (string, error) {
+func Create(client *mautrix.Client, username string, password string, bridge *Bridges) (string, error) {
 	fmt.Printf("[+] Creating user: %s\n", username)
 
 	_, err := client.RegisterAvailable(context.Background(), username)
@@ -153,7 +164,7 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 
 	client.AccessToken = resp.AccessToken
 
-	err = ProcessActiveSessions(client, username, password, resp.AccessToken)
+	err = ProcessActiveSessions(client, username, password, resp.AccessToken, bridge, false)
 	if err != nil {
 		return "", err
 	}
@@ -210,7 +221,7 @@ func (b *Bridges) GetInvites(
 				roomName := evt.Content.AsMember().Displayname
 
 				clientDB.Init()
-				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, roomTypes.Contact.Parse(), false)
+				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, int(RoomTypeContact), false)
 			}
 		}
 	}
@@ -232,9 +243,14 @@ func SyncAllClients() error {
 				continue
 			}
 
+			log.Printf("Syncing %d clients", len(syncingClients.Bridge)+1)
 			go func(user Users) {
 				homeServer := cfg.HomeServer
-				client, err := mautrix.NewClient(homeServer, id.NewUserID(user.Username, cfg.HomeServerDomain), user.AccessToken)
+				client, err := mautrix.NewClient(
+					homeServer,
+					id.NewUserID(user.Username, cfg.HomeServerDomain),
+					user.AccessToken,
+				)
 				if err != nil {
 					log.Println("Error creating bridge for user:", err, user.Username)
 					return
@@ -258,12 +274,11 @@ func SyncAllClients() error {
 				}
 
 				defer func() {
-					syncingClients.Registry[user.Username] = false
+					delete(syncingClients.Registry, user.Username)
 					delete(syncingClients.Bridge, user.Username)
 				}()
 			}(user)
+			time.Sleep(3 * time.Second)
 		}
-		log.Printf("Syncing %d clients", len(syncingClients.Bridge))
-		time.Sleep(3 * time.Second)
 	}
 }
