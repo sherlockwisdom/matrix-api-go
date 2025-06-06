@@ -181,11 +181,16 @@ func Sync(
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
 
+	// TODO: multiple sync for the same client makes it fail
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
+		// log.Println("[Sync] Event:", evt)
 		// bridge.ChEvt <- evt
 		// bridge.GetInvites(client, evt)
 		go func() {
 			bridge.ChEvt <- evt
+		}()
+
+		go func() {
 			bridge.GetInvites(client, evt)
 		}()
 	})
@@ -272,25 +277,29 @@ func SyncAllClients() error {
 				syncingClients.Registry[user.Username] = true
 				wg := sync.WaitGroup{}
 				for _, bridge := range bridges {
-					wg.Add(1)
 					bridge.Client = client
-					go func(user Users) {
-						log.Println("Syncing bridge for user:", user.Username, bridge.Room.ID)
-						syncingClients.Bridge[user.Username] = append(syncingClients.Bridge[user.Username], &bridge)
-						err = Sync(client, &bridge)
+
+					mapMutex.Lock()
+					syncingClients.Bridge[user.Username] = append(syncingClients.Bridge[user.Username], &bridge)
+					mapMutex.Unlock()
+
+					wg.Add(1)
+					go func(user Users, _bridge *Bridges) {
+						log.Printf("Syncing bridge for user: %s %s %s %p\n", user.Username, _bridge.Name, _bridge.Room.ID, _bridge.ChEvt)
+						err = Sync(client, _bridge)
 						if err != nil {
 							log.Println("Sync error for user:", err, client.UserID.String())
 						}
 						wg.Done()
-					}(user)
+					}(user, &bridge)
 				}
 
+				wg.Wait()
 				defer func() {
 					delete(syncingClients.Registry, user.Username)
 					delete(syncingClients.Bridge, user.Username)
 					log.Println("Deleted syncing for user:", user.Username)
 				}()
-				wg.Wait()
 			}(user)
 			time.Sleep(3 * time.Second)
 		}

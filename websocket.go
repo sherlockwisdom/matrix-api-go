@@ -49,7 +49,7 @@ func GetWebsocketIndex(username string, platformName string) int {
 }
 
 func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Websocket handler called", wd.Bridge.Client.UserID)
+	// log.Printf("Websocket handler called %s %p\n", wd.Bridge.Client.UserID, wd.Bridge.ChEvt)
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
@@ -59,6 +59,7 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(c *websocket.Conn) {
+		log.Printf("Websocket handler called %s %p\n", wd.Bridge.Client.UserID, wd.Bridge.ChEvt)
 		defer wg.Done()
 		for {
 			data := <-wd.Bridge.ChImage
@@ -84,7 +85,7 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}(conn)
 
-	err = wd.Bridge.AddDevice(wd.Bridge.Client)
+	err = wd.Bridge.AddDevice()
 	if err != nil {
 		log.Printf("Failed to add device: %v", err)
 		return
@@ -131,7 +132,7 @@ func (wd *WebsocketData) RegisterWebsocket(platformName string, username string)
 	wd.ch <- []byte(websocketUrl)
 }
 
-func (wd *WebsocketData) MainWebsocket(tls bool) error {
+func MainWebsocket(tls bool) error {
 	cfg, err := (&Conf{}).getConf()
 	if err != nil {
 		panic(err)

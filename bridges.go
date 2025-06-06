@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -29,9 +30,7 @@ type Bridges struct {
 	ChImage chan []byte
 }
 
-func (b *Bridges) AddDevice(
-	client *mautrix.Client,
-) error {
+func (b *Bridges) AddDevice() error {
 	conf, err := (&Conf{}).getConf()
 
 	if err != nil {
@@ -41,8 +40,8 @@ func (b *Bridges) AddDevice(
 	log.Println("Getting configs for:", b.Name)
 	if cfg, ok := conf.GetBridgeConfig(b.Name); ok {
 		var clientDb = ClientDB{
-			username: client.UserID.Localpart(),
-			filepath: "db/" + client.UserID.Localpart() + ".db",
+			username: b.Client.UserID.Localpart(),
+			filepath: "db/" + b.Client.UserID.Localpart() + ".db",
 		}
 
 		if err := clientDb.Init(); err != nil {
@@ -57,12 +56,17 @@ func (b *Bridges) AddDevice(
 
 		b.Room = room
 
+		var wg sync.WaitGroup
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
+			wg.Add(1)
 			go func() {
 				since := time.Now().UnixMilli()
+				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChEvt)
 				for evt := range b.ChEvt {
-					if evt.RoomID == b.Room.ID && evt.Sender != client.UserID && evt.Timestamp >= since &&
+					if evt.RoomID == b.Room.ID && evt.Sender != b.Client.UserID && evt.Timestamp >= since &&
 						evt.Type == event.EventMessage {
+						log.Println("Event:", evt)
+
 						failedCmd := cfg.Cmd["failed"]
 
 						if evt.Content.Raw["msgtype"] == "m.notice" &&
@@ -74,7 +78,7 @@ func (b *Bridges) AddDevice(
 
 						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
 							url := evt.Content.AsMessage().URL
-							file, err := ParseImage(client, string(url))
+							file, err := ParseImage(b.Client, string(url))
 							if err != nil {
 								fmt.Println(err)
 							}
@@ -86,10 +90,11 @@ func (b *Bridges) AddDevice(
 						}
 					}
 				}
+				defer wg.Done()
 			}()
 
 			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.Room.ID)
-			_, err = client.SendText(
+			_, err = b.Client.SendText(
 				context.Background(),
 				id.RoomID(b.Room.ID),
 				loginCmd,
@@ -100,8 +105,7 @@ func (b *Bridges) AddDevice(
 			}
 
 		}
-
+		wg.Wait()
 	}
-
 	return err
 }

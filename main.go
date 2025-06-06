@@ -381,8 +381,9 @@ func ApiAddDevice(c *gin.Context) {
 
 	var bridge *Bridges
 	for _, _bridge := range syncingClients.Bridge[username] {
-		log.Println("[Add Device] Checking Bridge for user:", username, _bridge.Name)
+		log.Printf("[Add Device] Checking Bridge for user: %s %s %p\n", username, _bridge.Name, _bridge.ChEvt)
 		if _bridge.Name == platformName {
+			log.Println("[Add Device] Found bridge:", username, _bridge.Name)
 			bridge = _bridge
 			break
 		}
@@ -398,6 +399,7 @@ func ApiAddDevice(c *gin.Context) {
 		ch:     make(chan []byte, 1),
 		Bridge: bridge,
 	}
+	log.Printf("[API] Bridge: %p\n", websocket.Bridge.ChEvt)
 
 	client, err := mautrix.NewClient(
 		cfg.HomeServer,
@@ -460,7 +462,7 @@ func CliFlow() {
 	case "--websocket":
 		var wd = WebsocketData{ch: make(chan []byte, 1)}
 		wd.ch <- []byte("may the force!")
-		err := wd.MainWebsocket(false)
+		err := MainWebsocket(false)
 		if err != nil {
 			panic(err)
 		}
@@ -515,7 +517,7 @@ func main() {
 
 	if tlsCert != "" && tlsKey != "" {
 		go func() {
-			err := GlobalWebsocketConnection.MainWebsocket(true)
+			err := MainWebsocket(true)
 			if err != nil {
 				panic(err)
 			}
@@ -525,7 +527,7 @@ func main() {
 	}
 
 	go func() {
-		err := GlobalWebsocketConnection.MainWebsocket(false)
+		err := MainWebsocket(false)
 		if err != nil {
 			panic(err)
 		}

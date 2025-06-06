@@ -347,7 +347,7 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
 
 	defer rows.Close()
 
-	var rooms = []Bridges{}
+	var bridges = []Bridges{}
 	for rows.Next() {
 		var clientUsername string
 		var _roomID string
@@ -361,8 +361,8 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
 			return []Bridges{}, err
 		}
 
-		rooms = append(rooms, Bridges{
-			ChEvt:   make(chan *event.Event, 1),
+		bridges = append(bridges, Bridges{
+			ChEvt:   make(chan *event.Event, 500),
 			ChImage: make(chan []byte, 1),
 			Room: Rooms{
 				ID:       id.RoomID(_roomID),
@@ -377,5 +377,5 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
 		})
 	}
 
-	return rooms, err
+	return bridges, err
 }

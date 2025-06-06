@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"maunium.net/go/mautrix"
@@ -15,17 +16,21 @@ import (
 
 var cfg, cfgError = (&Conf{}).getConf()
 var GlobalWebsocketConnection = WebsocketData{
-	ch: make(chan []byte, 500),
+	ch:       make(chan []byte, 500),
+	Registry: make([]*WebsocketMap, 0),
 }
 
 var ks = Keystore{
 	filepath: cfg.KeystoreFilepath,
 }
 
-var syncingClients = SyncingClients{
-	Bridge:   make(map[string][]*Bridges),
-	Registry: make(map[string]bool),
-}
+var (
+	syncingClients = SyncingClients{
+		Bridge:   make(map[string][]*Bridges),
+		Registry: make(map[string]bool),
+	}
+	mapMutex = sync.Mutex{}
+)
 
 func JoinRooms(
 	client *mautrix.Client,
