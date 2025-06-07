@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/id"
 )
 
 type BridgeConfig struct {
@@ -51,4 +55,13 @@ func (c *Conf) GetBridgeConfig(bridgeType string) (*BridgeConfig, bool) {
 		}
 	}
 	return nil, false
+}
+
+func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
+	fmt.Printf(">>\tParsing image for: %v\n", url)
+	contentUrl, err := id.ParseContentURI(url)
+	if err != nil {
+		panic(err)
+	}
+	return client.DownloadBytes(context.Background(), contentUrl)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 
@@ -229,15 +228,6 @@ func (r *Rooms) Join(
 	return err
 }
 
-func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
-	fmt.Printf(">>\tParsing image for: %v\n", url)
-	contentUrl, err := id.ParseContentURI(url)
-	if err != nil {
-		panic(err)
-	}
-	return client.DownloadBytes(context.Background(), contentUrl)
-}
-
 func (r *Rooms) IsBridgeInviteForContact(evt *event.Event) (bool, error) {
 	// TODO: check if the invite is from a bridge bot but not a bridge room
 	for _, bridge := range cfg.Bridges {
@@ -278,4 +268,19 @@ func (r *Rooms) IsBridgeMessage(evt *event.Event) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (r *Rooms) GetRoomMembers(client *mautrix.Client, roomId id.RoomID) ([]id.UserID, error) {
+	members, err := client.JoinedMembers(context.Background(), roomId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var membersList []id.UserID
+	for userId, _ := range members.Joined {
+		membersList = append(membersList, userId)
+	}
+
+	return membersList, nil
 }
