@@ -109,3 +109,62 @@ func (b *Bridges) AddDevice() error {
 	}
 	return err
 }
+
+func (b *Bridges) JoinRooms(
+	client *mautrix.Client,
+	username string,
+) error {
+	clientDB := ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+
+	clientRooms, err := b.Room.JoinedRooms(client)
+	if err != nil {
+		return err
+	}
+	log.Println("Client Rooms: ", clientRooms)
+
+	for _, entry := range cfg.Bridges {
+		for name, config := range entry {
+			managementRoom := false
+			for _, clientRoom := range clientRooms {
+				managementRoom, err = b.IsManagementRoom(config.BotName, clientRoom)
+				if err != nil {
+					return err
+				}
+
+				if managementRoom {
+					break
+				}
+
+			}
+			if !managementRoom {
+				roomId, err := b.Room.CreateRoom(
+					client, name, config.BotName, RoomTypeManagement, true,
+				)
+				if err != nil {
+					return err
+				}
+				log.Println("[+] Created room successfully for:", config.BotName, roomId)
+			}
+		}
+	}
+	return nil
+}
+
+func (b *Bridges) IsManagementRoom(bridgeBotName string, roomId id.RoomID) (bool, error) {
+	members, err := b.Room.GetRoomMembers(b.Client, roomId)
+	if err != nil {
+		return false, err
+	}
+
+	for _, member := range members {
+		if member.String() == bridgeBotName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

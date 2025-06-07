@@ -57,6 +57,16 @@ func (c *Conf) GetBridgeConfig(bridgeType string) (*BridgeConfig, bool) {
 	return nil, false
 }
 
+func (c *Conf) GetBridges() []*Bridges {
+	var bridges []*Bridges
+	for _, entry := range c.Bridges {
+		for name, _ := range entry {
+			bridges = append(bridges, &Bridges{Name: name})
+		}
+	}
+	return bridges
+}
+
 func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 	fmt.Printf(">>\tParsing image for: %v\n", url)
 	contentUrl, err := id.ParseContentURI(url)

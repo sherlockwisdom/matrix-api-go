@@ -53,7 +53,7 @@ func ProcessActiveSessions(
 		}
 	}
 
-	JoinRooms(client, bridge, username)
+	bridge.JoinRooms(client, username)
 	return nil
 }
 
@@ -176,7 +176,7 @@ func Create(client *mautrix.Client, username string, password string, bridge *Br
 
 func Sync(
 	client *mautrix.Client,
-	bridge *Bridges,
+	bridges []*Bridges,
 ) error {
 	syncer := mautrix.NewDefaultSyncer()
 	client.Syncer = syncer
@@ -186,13 +186,15 @@ func Sync(
 		// log.Println("[Sync] Event:", evt)
 		// bridge.ChEvt <- evt
 		// bridge.GetInvites(client, evt)
-		go func() {
-			bridge.ChEvt <- evt
-		}()
+		for _, bridge := range bridges {
+			go func() {
+				bridge.ChEvt <- evt
+			}()
 
-		go func() {
-			bridge.GetInvites(client, evt)
-		}()
+			go func() {
+				bridge.GetInvites(client, evt)
+			}()
+		}
 	})
 
 	if err := client.Sync(); err != nil {
@@ -251,6 +253,9 @@ func SyncAllClients() error {
 
 			log.Printf("Syncing %d clients", len(syncingClients.Bridge)+1)
 			go func(user Users) {
+				wg := sync.WaitGroup{}
+				wg.Add(1)
+
 				homeServer := cfg.HomeServer
 				client, err := mautrix.NewClient(
 					homeServer,
@@ -262,44 +267,27 @@ func SyncAllClients() error {
 					return
 				}
 
-				var clientDB ClientDB = ClientDB{
-					username: user.Username,
-					filepath: "db/" + user.Username + ".db",
-				}
-				clientDB.Init()
-
-				bridges, err := clientDB.FetchBridgeRooms(user.Username)
-				if err != nil {
-					log.Println("Error fetching bridge rooms for user:", err, user.Username)
-					return
-				}
-
 				syncingClients.Registry[user.Username] = true
-				wg := sync.WaitGroup{}
+
+				bridges := cfg.GetBridges()
 				for _, bridge := range bridges {
 					bridge.Client = client
 
-					mapMutex.Lock()
-					syncingClients.Bridge[user.Username] = append(syncingClients.Bridge[user.Username], &bridge)
-					mapMutex.Unlock()
-
-					wg.Add(1)
-					go func(user Users, _bridge *Bridges) {
-						log.Printf("Syncing bridge for user: %s %s %s %p\n", user.Username, _bridge.Name, _bridge.Room.ID, _bridge.ChEvt)
-						err = Sync(client, _bridge)
-						if err != nil {
-							log.Println("Sync error for user:", err, client.UserID.String())
-						}
-						wg.Done()
-					}(user, &bridge)
+					bridge.JoinRooms(client, user.Username)
 				}
 
-				wg.Wait()
+				err = Sync(client, bridges)
+				if err != nil {
+					log.Println("Sync error for user:", err, client.UserID.String())
+					wg.Done()
+				}
+
 				defer func() {
 					delete(syncingClients.Registry, user.Username)
 					delete(syncingClients.Bridge, user.Username)
 					log.Println("Deleted syncing for user:", user.Username)
 				}()
+				wg.Wait()
 			}(user)
 			time.Sleep(3 * time.Second)
 		}

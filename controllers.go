@@ -32,41 +32,6 @@ var (
 	mapMutex = sync.Mutex{}
 )
 
-func JoinRooms(
-	client *mautrix.Client,
-	bridge *Bridges,
-	username string,
-) error {
-	clientDB := ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDB.Init()
-
-	clientRooms, err := bridge.Room.JoinedRooms(client)
-	if err != nil {
-		return err
-	}
-	log.Println("Client Rooms: ", clientRooms)
-
-	for _, entry := range cfg.Bridges {
-		for name, config := range entry {
-			if fRoooms, err := clientDB.FetchRoomsByMembers(name); fRoooms.ID == "" && err == nil {
-				log.Println("[+] Creating room for:", name, config.BotName)
-				bridge.Room.User.Username = username
-				roomId, err := bridge.Room.CreateRoom(
-					client, name, config.BotName, RoomTypeManagement, true,
-				)
-				if err != nil {
-					return err
-				}
-				log.Println("[+] Created room successfully for:", config.BotName, roomId)
-			}
-		}
-	}
-	return nil
-}
-
 func CreateProcess(
 	client *mautrix.Client,
 	bridge *Bridges,
@@ -142,7 +107,7 @@ func CompleteRun(
 	}()
 
 	go func() {
-		err := Sync(client, bridge)
+		err := Sync(client, []*Bridges{bridge})
 		if err != nil {
 			panic(err)
 		}
