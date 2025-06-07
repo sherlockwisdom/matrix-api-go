@@ -38,7 +38,7 @@ func (b *Bridges) AddDevice() error {
 	}
 
 	log.Println("Getting configs for:", b.Name)
-	if cfg, ok := conf.GetBridgeConfig(b.Name); ok {
+	if bridgeCfg, ok := conf.GetBridgeConfig(b.Name); ok {
 		var clientDb = ClientDB{
 			username: b.Client.UserID.Localpart(),
 			filepath: "db/" + b.Client.UserID.Localpart() + ".db",
@@ -61,7 +61,7 @@ func (b *Bridges) AddDevice() error {
 		}
 
 		var wg sync.WaitGroup
-		if loginCmd, exists := cfg.Cmd["login"]; exists {
+		if loginCmd, exists := bridgeCfg.Cmd["login"]; exists {
 			wg.Add(1)
 			go func() {
 				since := time.Now().UnixMilli()
@@ -78,13 +78,20 @@ func (b *Bridges) AddDevice() error {
 
 						log.Println("Event:", evt)
 
-						failedCmd := cfg.Cmd["failed"]
-
-						if evt.Content.Raw["msgtype"] == "m.notice" &&
-							strings.Contains(evt.Content.AsMessage().Body, failedCmd) {
-							log.Println("Get new notice to failed:", evt)
+						failedCmd := bridgeCfg.Cmd["failed"]
+						matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
+						if err != nil {
+							log.Println("Error checking success pattern:", err)
 							b.ChImage <- nil
 							break
+						}
+
+						if evt.Content.Raw["msgtype"] == "m.notice" {
+							if strings.Contains(evt.Content.AsMessage().Body, failedCmd) || matchesSuccess {
+								log.Println("Get new notice to failed or success:", evt)
+								b.ChImage <- nil
+								break
+							}
 						}
 
 						if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {

@@ -38,6 +38,15 @@ type WebsocketMap struct {
 	Websocket    *WebsocketData
 }
 
+func GetWebsocketUsernameIndex(username string) int {
+	for index, _wd := range GlobalWebsocketConnection.Registry {
+		if _wd.Username == username {
+			return index
+		}
+	}
+	return -1
+}
+
 func GetWebsocketIndex(username string, platformName string) int {
 	for index, _wd := range GlobalWebsocketConnection.Registry {
 		if _wd.Username == username &&
@@ -106,6 +115,12 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 
 func (wd *WebsocketData) RegisterWebsocket(platformName string, username string) {
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
+
+	if wd.Bridge.Client == nil {
+		log.Println("Client is nil, skipping websocket registration")
+		return
+	}
+
 	if index := GetWebsocketIndex(username, platformName); index > -1 {
 		log.Println("[+] Incoming socket connection but one already exist", wd.Bridge.Client.UserID)
 

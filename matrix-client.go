@@ -238,6 +238,7 @@ func (b *Bridges) GetInvites(
 
 func SyncAllClients() error {
 	log.Println("Syncing all clients")
+	var wg sync.WaitGroup
 	for {
 		users, err := ks.FetchAllUsers()
 
@@ -252,10 +253,8 @@ func SyncAllClients() error {
 			}
 
 			log.Printf("Syncing %d clients", len(syncingClients.Bridge)+1)
+			wg.Add(1)
 			go func(user Users) {
-				wg := sync.WaitGroup{}
-				wg.Add(1)
-
 				homeServer := cfg.HomeServer
 				client, err := mautrix.NewClient(
 					homeServer,
@@ -281,17 +280,16 @@ func SyncAllClients() error {
 				err = Sync(client, bridges)
 				if err != nil {
 					log.Println("Sync error for user:", err, client.UserID.String())
-					wg.Done()
 				}
 
 				defer func() {
 					delete(syncingClients.Registry, user.Username)
 					delete(syncingClients.Bridge, user.Username)
 					log.Println("Deleted syncing for user:", user.Username)
+					wg.Done()
 				}()
-				wg.Wait()
 			}(user)
-			time.Sleep(3 * time.Second)
 		}
+		time.Sleep(3 * time.Second)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 	"maunium.net/go/mautrix"
@@ -74,4 +76,25 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 		panic(err)
 	}
 	return client.DownloadBytes(context.Background(), contentUrl)
+}
+
+func (c *Conf) CheckSuccessPattern(bridgeType string, input string) (bool, error) {
+	config, ok := c.GetBridgeConfig(bridgeType)
+	if !ok {
+		return false, fmt.Errorf("bridge type %s not found in configuration", bridgeType)
+	}
+
+	successPattern, ok := config.Cmd["success"]
+	if !ok {
+		return false, fmt.Errorf("success pattern not found for bridge type %s", bridgeType)
+	}
+
+	// Replace %s with .* to create a regex pattern
+	regexPattern := strings.ReplaceAll(successPattern, "%s", ".*")
+	matched, err := regexp.MatchString(regexPattern, input)
+	if err != nil {
+		return false, fmt.Errorf("error matching pattern: %v", err)
+	}
+
+	return matched, nil
 }
