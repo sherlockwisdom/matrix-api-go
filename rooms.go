@@ -200,22 +200,6 @@ func (r *Rooms) CreateRoom(
 	r.ID = resp.RoomID
 	r.Type = _type
 
-	var clientDB ClientDB = ClientDB{
-		username: r.User.Username,
-		filepath: "db/" + r.User.Username + ".db",
-	}
-
-	clientDB.Init()
-	if err := clientDB.StoreRooms(
-		r.ID.String(),
-		name,
-		members,
-		int(_type),
-		isBridge,
-	); err != nil {
-		return resp.RoomID, err
-	}
-
 	return resp.RoomID, nil
 }
 

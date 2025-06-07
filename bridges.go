@@ -48,13 +48,17 @@ func (b *Bridges) AddDevice() error {
 			return err
 		}
 
-		room, err := clientDb.FetchRoomsByMembers(b.Name)
-		if err != nil {
-			return err
+		var room Rooms
+		for _, bridge := range syncingClients.Bridge[b.Client.UserID.Localpart()] {
+			if bridge.Name == b.Name {
+				room = bridge.Room
+				break
+			}
 		}
-		log.Println("Room:", room)
 
-		b.Room = room
+		if room.ID == "" {
+			return fmt.Errorf("room not found for bridge: %s", b.Name)
+		}
 
 		var wg sync.WaitGroup
 		if loginCmd, exists := cfg.Cmd["login"]; exists {
@@ -63,8 +67,15 @@ func (b *Bridges) AddDevice() error {
 				since := time.Now().UnixMilli()
 				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChEvt)
 				for evt := range b.ChEvt {
-					if evt.RoomID == b.Room.ID && evt.Sender != b.Client.UserID && evt.Timestamp >= since &&
+					if evt.RoomID == b.Room.ID &&
+						evt.Sender != b.Client.UserID &&
+						evt.Timestamp >= since &&
 						evt.Type == event.EventMessage {
+
+						if evt.Content.AsMessage().Body == "!adddevice" {
+							b.AddDevice()
+						}
+
 						log.Println("Event:", evt)
 
 						failedCmd := cfg.Cmd["failed"]
@@ -113,13 +124,8 @@ func (b *Bridges) AddDevice() error {
 func (b *Bridges) JoinRooms(
 	client *mautrix.Client,
 	username string,
+	joinAllBridges bool,
 ) error {
-	clientDB := ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDB.Init()
-
 	clientRooms, err := b.Room.JoinedRooms(client)
 	if err != nil {
 		return err
@@ -128,26 +134,34 @@ func (b *Bridges) JoinRooms(
 
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
-			managementRoom := false
-			for _, clientRoom := range clientRooms {
-				managementRoom, err = b.IsManagementRoom(config.BotName, clientRoom)
-				if err != nil {
-					return err
-				}
+			if name == b.Name {
+				managementRoom := false
+				var roomId id.RoomID
+				for _, clientRoom := range clientRooms {
+					managementRoom, err = b.IsManagementRoom(config.BotName, clientRoom)
+					if err != nil {
+						return err
+					}
+					roomId = clientRoom
 
-				if managementRoom {
-					break
-				}
+					if managementRoom {
+						break
+					}
 
-			}
-			if !managementRoom {
-				roomId, err := b.Room.CreateRoom(
-					client, name, config.BotName, RoomTypeManagement, true,
-				)
-				if err != nil {
-					return err
 				}
-				log.Println("[+] Created room successfully for:", config.BotName, roomId)
+				if !managementRoom {
+					roomId, err := b.Room.CreateRoom(
+						client, name, config.BotName, RoomTypeManagement, true,
+					)
+					if err != nil {
+						return err
+					}
+					log.Println("[+] Created room successfully for:", config.BotName, roomId)
+				}
+				b.Room.ID = roomId
+				if !joinAllBridges {
+					return nil
+				}
 			}
 		}
 	}

@@ -53,7 +53,7 @@ func ProcessActiveSessions(
 		}
 	}
 
-	bridge.JoinRooms(client, username)
+	bridge.JoinRooms(client, username, true)
 	return nil
 }
 
@@ -267,14 +267,16 @@ func SyncAllClients() error {
 					return
 				}
 
-				syncingClients.Registry[user.Username] = true
-
 				bridges := cfg.GetBridges()
 				for _, bridge := range bridges {
+					bridge.ChEvt = make(chan *event.Event, 100)
+					bridge.ChImage = make(chan []byte, 100)
 					bridge.Client = client
 
-					bridge.JoinRooms(client, user.Username)
+					bridge.JoinRooms(client, user.Username, false)
 				}
+				syncingClients.Registry[user.Username] = true
+				syncingClients.Bridge[user.Username] = bridges
 
 				err = Sync(client, bridges)
 				if err != nil {
