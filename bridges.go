@@ -72,10 +72,6 @@ func (b *Bridges) AddDevice() error {
 						evt.Timestamp >= since &&
 						evt.Type == event.EventMessage {
 
-						if evt.Content.AsMessage().Body == "!adddevice" {
-							b.AddDevice()
-						}
-
 						log.Println("Event:", evt)
 
 						failedCmd := bridgeCfg.Cmd["failed"]
@@ -108,10 +104,17 @@ func (b *Bridges) AddDevice() error {
 						}
 					}
 				}
+				_, err = b.Client.SendText(
+					context.Background(),
+					id.RoomID(b.Room.ID),
+					bridgeCfg.Cmd["cancel"],
+				)
+
 				defer wg.Done()
 			}()
 
 			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.Room.ID)
+
 			_, err = b.Client.SendText(
 				context.Background(),
 				id.RoomID(b.Room.ID),
@@ -182,7 +185,7 @@ func (b *Bridges) IsManagementRoom(bridgeBotName string, roomId id.RoomID) (bool
 	}
 
 	for _, member := range members {
-		if member.String() == bridgeBotName {
+		if member.String() == bridgeBotName && len(members) == 2 {
 			return true, nil
 		}
 	}

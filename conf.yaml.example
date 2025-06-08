@@ -14,6 +14,7 @@ bridges:
         login: "!signal login"
         failed: "Login failed: too many QR code refreshes"
         success: "Successfully logged in as %s / %s"
+        cancel: "!signal cancel"
 
   - wa:
       botname: "@whatsappbot:relaysms.me"
@@ -21,3 +22,4 @@ bridges:
         login: "!wa login qr"
         failed: "Login failed: Entering code or scanning QR timed out. Please try again."
         success: "Successfully logged in as %s"
+        cancel: "!wa cancel"
