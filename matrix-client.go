@@ -24,24 +24,29 @@ type ClientDB struct {
 	filepath   string
 }
 
-func ProcessActiveSessions(
-	client *mautrix.Client,
-	username string,
+type MatrixClient struct {
+	Client *mautrix.Client
+}
+
+/*
+This function adds the user to the database and joins the bridge rooms
+*/
+func (m *MatrixClient) ProcessActiveSessions(
 	password string,
 ) error {
-	if client.AccessToken != "" && username != "" && password != "" {
-		err := ks.CreateUser(username, client.AccessToken)
+	if m.Client.AccessToken != "" && m.Client.UserID != "" && password != "" {
+		err := ks.CreateUser(m.Client.UserID.String(), m.Client.AccessToken)
 		if err != nil {
 			return err
 		}
 
 		var clientDB ClientDB = ClientDB{
-			username: username,
-			filepath: "db/" + username + ".db",
+			username: m.Client.UserID.Localpart(),
+			filepath: "db/" + m.Client.UserID.Localpart() + ".db",
 		}
 		clientDB.Init()
 
-		err = clientDB.Store(client.AccessToken, password)
+		err = clientDB.Store(m.Client.AccessToken, password)
 
 		if err != nil {
 			return err
@@ -52,9 +57,9 @@ func ProcessActiveSessions(
 		for name, config := range entry {
 			bridge := Bridges{
 				Name:   name,
-				Client: client,
+				Client: m.Client,
 			}
-			err := bridge.JoinRooms(username, config.BotName)
+			err := bridge.JoinRooms(m.Client.UserID.Localpart(), config.BotName)
 			if err != nil {
 				return err
 			}
@@ -88,19 +93,17 @@ func LoadActiveSessionsByAccessToken(
 	return accessToken, nil
 }
 
-func LoadActiveSessions(
-	client *mautrix.Client,
-	username string,
+func (m *MatrixClient) LoadActiveSessions(
 	password string,
 ) (string, error) {
-	fmt.Println("Loading active sessions: ", username, password)
+	fmt.Println("Loading active sessions: ", m.Client.UserID.Localpart(), password)
 
 	var clientDB ClientDB = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
+		username: m.Client.UserID.Localpart(),
+		filepath: "db/" + m.Client.UserID.Localpart() + ".db",
 	}
 	clientDB.Init()
-	exists, err := clientDB.Authenticate(username, password)
+	exists, err := clientDB.Authenticate(m.Client.UserID.Localpart(), password)
 
 	if err != nil {
 		return "", err
@@ -110,17 +113,10 @@ func LoadActiveSessions(
 		return "", fmt.Errorf("user does not exist")
 	}
 
-	accessToken, err := clientDB.Fetch()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Found access token: %v\n", accessToken)
-
-	return accessToken, nil
+	return clientDB.Fetch()
 }
 
-func Login(client *mautrix.Client, username string, password string) (string, error) {
+func (m *MatrixClient) Login(username string, password string) (string, error) {
 	fmt.Printf("Login in as %s\n", username)
 
 	var clientDB ClientDB = ClientDB{
@@ -134,7 +130,7 @@ func Login(client *mautrix.Client, username string, password string) (string, er
 		User: username,
 	}
 
-	resp, err := client.Login(context.Background(), &mautrix.ReqLogin{
+	resp, err := m.Client.Login(context.Background(), &mautrix.ReqLogin{
 		Type: "m.login.password",
 		// User:     id.UserID(username),
 		Identifier: identifier,
@@ -144,7 +140,7 @@ func Login(client *mautrix.Client, username string, password string) (string, er
 		return "", err
 	}
 
-	err = ProcessActiveSessions(client, username, password)
+	err = m.ProcessActiveSessions(username, password)
 	if err != nil {
 		return "", err
 	}
@@ -165,10 +161,10 @@ func Logout(client *mautrix.Client) error {
 	return err
 }
 
-func Create(client *mautrix.Client, username string, password string) (string, error) {
+func (m *MatrixClient) Create(username string, password string) (string, error) {
 	fmt.Printf("[+] Creating user: %s\n", username)
 
-	_, err := client.RegisterAvailable(context.Background(), username)
+	_, err := m.Client.RegisterAvailable(context.Background(), username)
 	if err != nil {
 		return "", err
 	}
@@ -176,7 +172,7 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 	// 	log.Fatalf("Username '%s' is already taken", username)
 	// }
 
-	resp, _, err := client.Register(context.Background(), &mautrix.ReqRegister{
+	resp, _, err := m.Client.Register(context.Background(), &mautrix.ReqRegister{
 		Username: username,
 		Password: password,
 		Auth: map[string]interface{}{
@@ -191,12 +187,11 @@ func Create(client *mautrix.Client, username string, password string) (string, e
 	return resp.AccessToken, nil
 }
 
-func Sync(
-	client *mautrix.Client,
+func (m *MatrixClient) Sync(
 	bridges []*Bridges,
 ) error {
 	syncer := mautrix.NewDefaultSyncer()
-	client.Syncer = syncer
+	m.Client.Syncer = syncer
 
 	// TODO: multiple sync for the same client makes it fail
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
@@ -209,13 +204,13 @@ func Sync(
 			}()
 
 			go func() {
-				bridge.GetInvites(client, evt)
+				bridge.GetInvites(m.Client, evt)
 			}()
 		}
 	})
 
-	if err := client.Sync(); err != nil {
-		log.Println("Sync error for user:", err, client.UserID.String())
+	if err := m.Client.Sync(); err != nil {
+		log.Println("Sync error for user:", err, m.Client.UserID.String())
 		return err
 	}
 	return nil

@@ -197,7 +197,12 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	if err := LoginProcess(client, username, password); err != nil {
+	controller := Controller{
+		Client:   client,
+		Username: username,
+		Password: password,
+	}
+	if err := controller.LoginProcess(); err != nil {
 		log.Printf("Login failed for %s: %v", username, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Login failed", "details": err.Error()})
 		return
@@ -251,7 +256,13 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	if err := CreateProcess(client, username, password); err != nil {
+	controller := Controller{
+		Client:   client,
+		Username: username,
+		Password: password,
+	}
+
+	if err := controller.CreateProcess(); err != nil {
 		log.Printf("User creation failed for %s: %v\n", username, err)
 		c.JSON(http.StatusConflict, gin.H{"error": "User creation failed", "details": err.Error()})
 		return

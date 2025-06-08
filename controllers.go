@@ -1,18 +1,19 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"strings"
 	"sync"
-	"syscall"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/id"
 )
+
+type Controller struct {
+	Client      *mautrix.Client
+	Username    string
+	Password    string
+	AccessToken string
+}
 
 var cfg, cfgError = (&Conf{}).getConf()
 var GlobalWebsocketConnection = WebsocketData{
@@ -32,145 +33,47 @@ var (
 	mapMutex = sync.Mutex{}
 )
 
-func CreateProcess(
-	client *mautrix.Client,
-	username string,
-	password string,
-) error {
-	accessToken, err := Create(client, username, password)
+func (c *Controller) CreateProcess() error {
+	m := MatrixClient{
+		Client: c.Client,
+	}
+	accessToken, err := m.Create(c.Username, c.Password)
 
 	if err != nil {
 		return err
 	}
 
-	log.Println("[+] Created user: ", username)
+	c.Client.UserID = id.NewUserID(c.Username, cfg.HomeServerDomain)
+	c.Client.AccessToken = accessToken
+	log.Println("[+] Created user: ", c.Username)
 
-	client.UserID = id.NewUserID(username, cfg.HomeServerDomain)
-	client.AccessToken = accessToken
-
-	err = ProcessActiveSessions(client, username, password)
+	err = m.ProcessActiveSessions(c.Password)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("User registered successfully. Access token: %s\n", accessToken)
-
 	return nil
 }
 
-func LoginProcess(
-	client *mautrix.Client,
-	username string,
-	password string,
-) error {
-	accessToken, err := LoadActiveSessions(client, username, password)
+func (c *Controller) LoginProcess() error {
+	m := MatrixClient{
+		Client: c.Client,
+	}
+	accessToken, err := m.LoadActiveSessions(c.Password)
 	if err != nil {
-		if _, err = Login(client, username, password); err != nil {
+		return err
+	}
+
+	if accessToken == "" {
+		if accessToken, err = m.Login(c.Username, c.Password); err != nil {
 			return err
 		}
 	}
 
-	client.AccessToken = accessToken
-
-	err = ProcessActiveSessions(client, username, password)
+	c.Client.AccessToken = accessToken
+	err = m.ProcessActiveSessions(c.Password)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func CompleteRun(
-	client *mautrix.Client,
-	bridge *Bridges,
-) {
-	if len(client.AccessToken) < 3 {
-		log.Fatalf("Client access token expected: > 2, got: %d %v", len(client.AccessToken), client.AccessToken)
-		return
-	}
-
-	callback := func(inMd IncomingMessageMetaData, err error) {
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		switch inMd.Message.Type {
-		case "m.text":
-			log.Printf(">> %s %v\n", inMd.Type, inMd)
-		case "m.image":
-			rawImage, err := ParseImage(client, string(inMd.Message.Content.AsMessage().URL))
-			if err != nil {
-				panic(err)
-			}
-
-			filename := inMd.Message.Content.AsMessage().FileName
-			if filename == "" {
-				filename = inMd.Message.Content.AsMessage().Body
-			}
-			imageDownloadFilepath := "downloads/rooms/" + filename
-			os.WriteFile(imageDownloadFilepath, rawImage, 0644)
-			log.Printf("[+] Saved image to room dir: %s\n", imageDownloadFilepath)
-		default:
-			log.Printf("[-] Type not yet implemented: %v\n", inMd.Message.Content.Raw["msgtype"])
-		}
-	}
-
-	go func() {
-		bridge.Room.ListenJoinedRooms(client, callback)
-	}()
-
-	go func() {
-		err := Sync(client, []*Bridges{bridge})
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	messagingRoomId := ""
-	reader := bufio.NewReader(os.Stdin)
-
-	go func() {
-		for {
-			fmt.Printf("[%s]-> ", messagingRoomId)
-			text, _ := reader.ReadString('\n')
-
-			if text == "" || text == "\n" {
-				continue
-			}
-
-			text = strings.TrimSuffix(text, "\n")
-
-			if strings.Contains(text, ">room") {
-				st := strings.Split(text, " ")
-				messagingRoomId = st[len(st)-1]
-				continue
-			}
-
-			if messagingRoomId == "" {
-				fmt.Println("** Messaging requires a room")
-				continue
-			}
-
-			room := Rooms{
-				ID: id.RoomID(messagingRoomId),
-			}
-
-			resp, err := room.SendRoomMessages(client, text)
-			if err != nil {
-				fmt.Printf("%v\n", err)
-			}
-
-			fmt.Println(resp)
-		}
-
-	}()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	<-sigChan
-	client.StopSync()
-	fmt.Println("\nShutdown signal received. Exiting...")
-
-	os.Exit(0)
 }
