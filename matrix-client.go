@@ -28,13 +28,8 @@ func ProcessActiveSessions(
 	client *mautrix.Client,
 	username string,
 	password string,
-	accessToken string,
-	bridge *Bridges,
-	existing bool,
 ) error {
-	if !existing {
-		client.AccessToken = accessToken
-
+	if client.AccessToken != "" && username != "" && password != "" {
 		err := ks.CreateUser(username, client.AccessToken)
 		if err != nil {
 			return err
@@ -53,15 +48,50 @@ func ProcessActiveSessions(
 		}
 	}
 
-	bridge.JoinRooms(client, username, true)
+	for _, entry := range cfg.Bridges {
+		for name, config := range entry {
+			bridge := Bridges{
+				Name:   name,
+				Client: client,
+			}
+			err := bridge.JoinRooms(username, config.BotName)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
+}
+
+func LoadActiveSessionsByAccessToken(
+	username string,
+	accessToken string,
+) (string, error) {
+	fmt.Println("Loading active sessions: ", username, accessToken)
+
+	var clientDB ClientDB = ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDB.Init()
+	exists, err := clientDB.AuthenticateAccessToken(username, accessToken)
+
+	if err != nil {
+		return "", err
+	}
+
+	if !exists {
+		return "", fmt.Errorf("access token does not exist")
+	}
+
+	return accessToken, nil
 }
 
 func LoadActiveSessions(
 	client *mautrix.Client,
 	username string,
 	password string,
-	bridge *Bridges,
 ) (string, error) {
 	fmt.Println("Loading active sessions: ", username, password)
 
@@ -87,15 +117,10 @@ func LoadActiveSessions(
 
 	fmt.Printf("Found access token: %v\n", accessToken)
 
-	err = ProcessActiveSessions(client, username, password, accessToken, bridge, false)
-	if err != nil {
-		return "", err
-	}
-
 	return accessToken, nil
 }
 
-func Login(client *mautrix.Client, username string, password string, bridge *Bridges) (string, error) {
+func Login(client *mautrix.Client, username string, password string) (string, error) {
 	fmt.Printf("Login in as %s\n", username)
 
 	var clientDB ClientDB = ClientDB{
@@ -119,7 +144,7 @@ func Login(client *mautrix.Client, username string, password string, bridge *Bri
 		return "", err
 	}
 
-	err = ProcessActiveSessions(client, username, password, resp.AccessToken, bridge, false)
+	err = ProcessActiveSessions(client, username, password)
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +165,7 @@ func Logout(client *mautrix.Client) error {
 	return err
 }
 
-func Create(client *mautrix.Client, username string, password string, bridge *Bridges) (string, error) {
+func Create(client *mautrix.Client, username string, password string) (string, error) {
 	fmt.Printf("[+] Creating user: %s\n", username)
 
 	_, err := client.RegisterAvailable(context.Background(), username)
@@ -163,14 +188,6 @@ func Create(client *mautrix.Client, username string, password string, bridge *Br
 		return resp.AccessToken, err
 	}
 
-	client.AccessToken = resp.AccessToken
-
-	err = ProcessActiveSessions(client, username, password, resp.AccessToken, bridge, false)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Printf("User registered successfully. Access token: %s\n", resp.AccessToken)
 	return resp.AccessToken, nil
 }
 
@@ -227,6 +244,7 @@ func (b *Bridges) GetInvites(
 				}
 
 				roomName := evt.Content.AsMember().Displayname
+				log.Println("roomName:", roomName)
 
 				clientDB.Init()
 				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, int(RoomTypeContact), false)
@@ -252,6 +270,12 @@ func SyncAllClients() error {
 				continue
 			}
 
+			clientDb := ClientDB{
+				username: user.Username,
+				filepath: "db/" + user.Username + ".db",
+			}
+			clientDb.Init()
+
 			log.Printf("Syncing %d clients", len(syncingClients.Bridge)+1)
 			wg.Add(1)
 			go func(user Users) {
@@ -266,13 +290,17 @@ func SyncAllClients() error {
 					return
 				}
 
-				bridges := cfg.GetBridges()
-				for _, bridge := range bridges {
-					bridge.ChEvt = make(chan *event.Event, 100)
-					bridge.ChImage = make(chan []byte, 100)
-					bridge.Client = client
+				// cfgBridges := cfg.GetBridges()
 
-					bridge.JoinRooms(client, user.Username, false)
+				bridges, err := clientDb.FetchBridgeRooms(user.Username)
+				if err != nil {
+					log.Println("Error fetching bridge rooms for user:", err, user.Username)
+					return
+				}
+
+				for _, bridge := range bridges {
+					bridge.Client = client
+					bridge.JoinRooms(user.Username, bridge.Room.Members[bridge.Name])
 				}
 				syncingClients.Registry[user.Username] = true
 				syncingClients.Bridge[user.Username] = bridges

@@ -197,14 +197,7 @@ func ApiLogin(c *gin.Context) {
 		return
 	}
 
-	var bridge = Bridges{
-		ChEvt: make(chan *event.Event),
-		Room: Rooms{
-			User: Users{Username: username},
-		},
-	}
-
-	if err := LoginProcess(client, &bridge, username, password); err != nil {
+	if err := LoginProcess(client, username, password); err != nil {
 		log.Printf("Login failed for %s: %v", username, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Login failed", "details": err.Error()})
 		return
@@ -258,14 +251,7 @@ func ApiCreate(c *gin.Context) {
 		return
 	}
 
-	var bridge = Bridges{
-		ChEvt: make(chan *event.Event),
-		Room: Rooms{
-			User: Users{Username: username},
-		},
-	}
-
-	if err := CreateProcess(client, &bridge, username, password); err != nil {
+	if err := CreateProcess(client, username, password); err != nil {
 		log.Printf("User creation failed for %s: %v\n", username, err)
 		c.JSON(http.StatusConflict, gin.H{"error": "User creation failed", "details": err.Error()})
 		return
@@ -379,11 +365,15 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
+	accessToken, err := LoadActiveSessionsByAccessToken(username, bridgeJsonRequest.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
+		return
+	}
+
 	var bridge *Bridges
 	for _, _bridge := range syncingClients.Bridge[username] {
-		log.Printf("[Add Device] Checking Bridge for user: %s %s %p\n", username, _bridge.Name, _bridge.ChEvt)
 		if _bridge.Name == platformName {
-			log.Println("[Add Device] Found bridge:", username, _bridge.Name)
 			bridge = _bridge
 			break
 		}
@@ -399,21 +389,14 @@ func ApiAddDevice(c *gin.Context) {
 		ch:     make(chan []byte, 1),
 		Bridge: bridge,
 	}
-	log.Printf("[API] Bridge: %p\n", websocket.Bridge.ChEvt)
 
-	client, err := mautrix.NewClient(
-		cfg.HomeServer,
-		id.NewUserID(username, cfg.HomeServerDomain),
-		bridgeJsonRequest.AccessToken,
-	)
-
+	client, err := mautrix.NewClient(cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
 		return
 	}
-
-	ProcessActiveSessions(client, username, "", "", bridge, true)
+	ProcessActiveSessions(client, username, "")
 
 	websocket.RegisterWebsocket(platformName, username)
 
@@ -448,7 +431,6 @@ func CliFlow() {
 		username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
 		err := CreateProcess(
 			client,
-			&bridge,
 			username,
 			password,
 		)
@@ -458,7 +440,7 @@ func CliFlow() {
 		}
 	case "--login":
 		username := os.Args[2]
-		LoginProcess(client, &bridge, username, password)
+		LoginProcess(client, username, password)
 	case "--websocket":
 		var wd = WebsocketData{ch: make(chan []byte, 1)}
 		wd.ch <- []byte("may the force!")

@@ -34,11 +34,10 @@ var (
 
 func CreateProcess(
 	client *mautrix.Client,
-	bridge *Bridges,
 	username string,
 	password string,
 ) error {
-	_, err := Create(client, username, password, bridge)
+	accessToken, err := Create(client, username, password)
 
 	if err != nil {
 		return err
@@ -47,21 +46,35 @@ func CreateProcess(
 	log.Println("[+] Created user: ", username)
 
 	client.UserID = id.NewUserID(username, cfg.HomeServerDomain)
+	client.AccessToken = accessToken
+
+	err = ProcessActiveSessions(client, username, password)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("User registered successfully. Access token: %s\n", accessToken)
 
 	return nil
 }
 
 func LoginProcess(
 	client *mautrix.Client,
-	bridge *Bridges,
 	username string,
 	password string,
 ) error {
-	_, err := LoadActiveSessions(client, username, password, bridge)
+	accessToken, err := LoadActiveSessions(client, username, password)
 	if err != nil {
-		if _, err = Login(client, username, password, bridge); err != nil {
+		if _, err = Login(client, username, password); err != nil {
 			return err
 		}
+	}
+
+	client.AccessToken = accessToken
+
+	err = ProcessActiveSessions(client, username, password)
+	if err != nil {
+		return err
 	}
 
 	return nil

@@ -125,7 +125,7 @@ func (clientDb *ClientDB) Init() error {
 	_, err = db.Exec(`
 	CREATE TABLE IF NOT EXISTS clients ( 
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
-	username TEXT NOT NULL, 
+	username TEXT NOT NULL UNIQUE, 
 	password TEXT NOT NULL,
 	accessToken TEXT NOT NULL, 
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -147,6 +147,24 @@ func (clientDb *ClientDB) Init() error {
 		return err
 	}
 	return err
+}
+
+func (clientDb *ClientDB) AuthenticateAccessToken(username string, accessToken string) (bool, error) {
+	query := `SELECT COUNT(*) FROM clients WHERE username = ? AND accessToken = ?`
+
+	var count int
+	err := clientDb.connection.QueryRow(query, username, accessToken).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("authentication query failed: %w", err)
+	}
+
+	if count == 0 {
+		log.Printf("[-] Authentication failed for user: %s", username)
+		return false, nil
+	}
+
+	log.Printf("[+] Authentication successful for user: %s", username)
+	return true, nil
 }
 
 func (clientDb *ClientDB) Authenticate(username string, password string) (bool, error) {
@@ -173,13 +191,16 @@ func (clientDb *ClientDB) Store(accessToken string, password string) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT INTO clients (username, accessToken, password) values(?,?,?)`)
+	stmt, err := tx.Prepare(`
+		INSERT OR REPLACE INTO clients (username, accessToken, password, timestamp) 
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+	`)
 	if err != nil {
 		return err
 	}
 
 	defer stmt.Close()
-	log.Println("[+] Storing for username:", clientDb.username, ", AT:", accessToken)
+	log.Println("[+] Storing/Updating for username:", clientDb.username, ", AT:", accessToken)
 
 	_, err = stmt.Exec(clientDb.username, accessToken, password)
 	if err != nil {
@@ -329,25 +350,25 @@ func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
 	return room, err
 }
 
-func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
+func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) {
 	log.Println("Fetching bridge rooms for", username, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
 		"select clientUsername, roomID, name, members, type, isBridge from rooms where clientUsername = ? and isBridge = 1",
 	)
 	if err != nil {
-		return []Bridges{}, err
+		return []*Bridges{}, err
 	}
 
 	defer stmt.Close()
 
 	rows, err := stmt.Query(username)
 	if err != nil {
-		return []Bridges{}, err
+		return []*Bridges{}, err
 	}
 
 	defer rows.Close()
 
-	var bridges = []Bridges{}
+	var bridges = []*Bridges{}
 	for rows.Next() {
 		var clientUsername string
 		var _roomID string
@@ -358,10 +379,10 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]Bridges, error) {
 
 		err = rows.Scan(&clientUsername, &_roomID, &name, &members, &_type, &isBridge)
 		if err != nil {
-			return []Bridges{}, err
+			return []*Bridges{}, err
 		}
 
-		bridges = append(bridges, Bridges{
+		bridges = append(bridges, &Bridges{
 			ChEvt:   make(chan *event.Event, 500),
 			ChImage: make(chan []byte, 1),
 			Room: Rooms{

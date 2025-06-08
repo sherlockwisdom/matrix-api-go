@@ -245,11 +245,7 @@ func (r *Rooms) IsBridgeMessage(evt *event.Event) (bool, error) {
 			return false, err
 		}
 
-		if !room.isBridge {
-			return false, nil
-		}
-
-		return true, nil
+		return room.isBridge, nil
 	}
 	return false, nil
 }
