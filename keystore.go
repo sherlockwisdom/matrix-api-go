@@ -140,6 +140,19 @@ func (clientDb *ClientDB) Init() error {
 	isBridge INTEGER NOT NULL,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS messages ( 
+	id INTEGER PRIMARY KEY AUTOINCREMENT, 
+	roomID TEXT NOT NULL,
+	message TEXT NOT NULL,
+	sender TEXT NOT NULL,
+	platformName TEXT NOT NULL,
+	messageType TEXT NOT NULL,
+	messageText TEXT NOT NULL,
+	rawMessage TEXT NOT NULL,
+	imageUrl TEXT,
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`)
 
 	if err != nil {
@@ -380,13 +393,47 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 		}
 
 		bridges = append(bridges, &Bridges{
-			ChEvt:   make(chan *event.Event, 1),
-			ChImage: make(chan []byte, 1),
-			RoomID:  id.RoomID(_roomID),
-			Name:    name,
-			BotName: members,
+			ChLoginSyncEvt: make(chan *event.Event, 1),
+			ChImageSyncEvt: make(chan []byte, 1),
+			RoomID:         id.RoomID(_roomID),
+			Name:           name,
+			BotName:        members,
 		})
 	}
 
 	return bridges, err
+}
+
+func (clientDb *ClientDB) StoreMessages(
+	roomID string,
+	message string,
+	messageType string,
+	messageText string,
+	rawMessage string,
+	imageUrl string,
+) error {
+	log.Println("[+] Storing message to:", roomID, message, messageType, messageText, rawMessage, imageUrl)
+	tx, err := clientDb.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO messages (roomID, message, messageType, messageText, rawMessage, imageUrl) values(?,?,?,?,?,?)`)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(roomID, message, messageType, messageText, rawMessage, imageUrl)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

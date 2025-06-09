@@ -249,8 +249,13 @@ func (m *MatrixClient) Sync() error {
 		bridges := syncingClients.Users[m.Client.UserID.Localpart()].Bridges
 		for _, bridge := range bridges {
 			bridge.Client = m.Client
+
 			go func() {
-				bridge.ChEvt <- evt
+				bridge.ChMsgEvt <- evt
+			}()
+
+			go func() {
+				bridge.ChLoginSyncEvt <- evt
 			}()
 
 			go func() {
@@ -291,62 +296,85 @@ func (m *MatrixClient) SyncAllClients() error {
 				continue
 			}
 			log.Printf("Syncing %d clients", len(userSync.Bridges)+1)
+
 			wg.Add(1)
-			go func(user Users) {
-				log.Println("Syncing user:", user.Username, user.AccessToken)
-				homeServer := cfg.HomeServer
-				client, err := mautrix.NewClient(
-					homeServer,
-					id.NewUserID(user.Username, cfg.HomeServerDomain),
-					user.AccessToken,
-				)
-				mc := MatrixClient{
-					Client: client,
-				}
+
+			go func(user Users, userSync *UserSync) {
+				err := m.syncClient(user, userSync)
 				if err != nil {
-					log.Println("Error creating bridge for user:", err, user.Username)
+					log.Println("Error syncing client:", err)
 					return
 				}
 
-				clientDb := ClientDB{
-					username: user.Username,
-					filepath: "db/" + user.Username + ".db",
-				}
+				defer func() {
+					delete(syncingClients.Users, user.Username)
+					log.Println("Deleted syncing for user:", user.Username)
+					wg.Done()
+				}()
+			}(user, userSync)
 
-				userSync.SyncMutex.Lock()
-				clientDb.Init()
-				bridges, err := clientDb.FetchBridgeRooms(user.Username)
-				userSync.SyncMutex.Unlock()
+			userSync.Syncing = false
 
-				log.Println("Bridges:", bridges)
-				if len(bridges) == 0 {
-					log.Println("No bridges found for user:", user.Username)
-					return
-				}
-
-				if err != nil {
-					log.Println("Error fetching bridge rooms for user:", err, user.Username)
-					return
-				}
-
-				// for _, bridge := range bridges {
-				// 	bridge.Client = client
-				// 	bridge.JoinRooms()
-				// }
-				userSync.Syncing = true
-				// syncingClients.Bridge[user.Username] = bridges
-
-				err = mc.Sync()
-				if err != nil {
-					log.Println("Sync error for user:", err, client.UserID.String())
-				}
-
-				userSync.Syncing = false
-				delete(syncingClients.Users, user.Username)
-				log.Println("Deleted syncing for user:", user.Username)
-				wg.Done()
-			}(user)
 		}
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
+	log.Println("Syncing user:", user.Username, user.AccessToken)
+	homeServer := cfg.HomeServer
+	client, err := mautrix.NewClient(
+		homeServer,
+		id.NewUserID(user.Username, cfg.HomeServerDomain),
+		user.AccessToken,
+	)
+	mc := MatrixClient{
+		Client: client,
+	}
+	if err != nil {
+		log.Println("Error creating bridge for user:", err, user.Username)
+		return err
+	}
+
+	clientDb := ClientDB{
+		username: user.Username,
+		filepath: "db/" + user.Username + ".db",
+	}
+
+	userSync.SyncMutex.Lock()
+	clientDb.Init()
+	bridges, err := clientDb.FetchBridgeRooms(user.Username)
+	userSync.SyncMutex.Unlock()
+
+	for _, bridge := range bridges {
+		bridge.Client = client
+	}
+
+	log.Println("Bridges:", bridges)
+	if len(bridges) == 0 {
+		log.Println("No bridges found for user:", user.Username)
+		return nil
+	}
+
+	if err != nil {
+		log.Println("Error fetching bridge rooms for user:", err, user.Username)
+		return err
+	}
+
+	userSync.Syncing = true
+	if len(syncingClients.Users[user.Username].Bridges) == 0 {
+		syncingClients.Users[user.Username].Bridges = append(
+			syncingClients.Users[user.Username].Bridges,
+			bridges...,
+		)
+	}
+
+	err = mc.Sync()
+
+	if err != nil {
+		log.Println("Sync error for user:", err, client.UserID.String())
+		return err
+	}
+
+	return nil
 }

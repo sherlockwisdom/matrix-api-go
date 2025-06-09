@@ -80,7 +80,7 @@ func ParseImage(client *mautrix.Client, url string) ([]byte, error) {
 	fmt.Printf(">>\tParsing image for: %v\n", url)
 	contentUrl, err := id.ParseContentURI(url)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return client.DownloadBytes(context.Background(), contentUrl)
 }

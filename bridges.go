@@ -23,12 +23,13 @@ type BridgesInterface interface {
 }
 
 type Bridges struct {
-	Name    string
-	BotName string
-	RoomID  id.RoomID
-	Client  *mautrix.Client
-	ChEvt   chan *event.Event
-	ChImage chan []byte
+	Name           string
+	BotName        string
+	RoomID         id.RoomID
+	Client         *mautrix.Client
+	ChLoginSyncEvt chan *event.Event
+	ChImageSyncEvt chan []byte
+	ChMsgEvt       chan *event.Event
 }
 
 func (b *Bridges) AddDevice() error {
@@ -65,8 +66,8 @@ func (b *Bridges) AddDevice() error {
 
 			go func() {
 				since := time.Now().UnixMilli()
-				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChEvt)
-				for evt := range b.ChEvt {
+				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChLoginSyncEvt)
+				for evt := range b.ChLoginSyncEvt {
 					if evt.RoomID == b.RoomID &&
 						evt.Sender != b.Client.UserID &&
 						evt.Timestamp >= since &&
@@ -76,14 +77,14 @@ func (b *Bridges) AddDevice() error {
 						matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
 						if err != nil {
 							log.Println("Error checking success pattern:", err)
-							b.ChImage <- nil
+							b.ChImageSyncEvt <- nil
 							break
 						}
 
 						if evt.Content.Raw["msgtype"] == "m.notice" {
 							if strings.Contains(evt.Content.AsMessage().Body, failedCmd) || matchesSuccess {
 								log.Println("Get new notice to failed or success:", evt)
-								b.ChImage <- nil
+								b.ChImageSyncEvt <- nil
 								break
 							}
 						}
@@ -92,11 +93,13 @@ func (b *Bridges) AddDevice() error {
 							url := evt.Content.AsMessage().URL
 							file, err := ParseImage(b.Client, string(url))
 							if err != nil {
-								fmt.Println(err)
+								log.Println("Error parsing image:", err)
+								b.ChImageSyncEvt <- nil
+								break
 							}
 
 							// return file, nil
-							b.ChImage <- file
+							b.ChImageSyncEvt <- file
 							log.Println("New message adding device:", evt.Content.AsMessage().FileName)
 							continue
 						}

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"maunium.net/go/mautrix/event"
 )
 
 // var upgrader = websocket.Upgrader{}
@@ -95,9 +94,9 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	go func(c *websocket.Conn) {
 		defer wg.Done()
 		for {
-			data := <-ws.Bridge.ChImage
-			fmt.Println(data)
+			data := <-ws.Bridge.ChImageSyncEvt
 			if data == nil {
+				c.Close()
 				return
 			}
 
@@ -141,10 +140,6 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 
 func (w *Websockets) RegisterWebsocket(platformName string, username string) string {
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
-
-	w.Bridge.Name = platformName
-	w.Bridge.ChEvt = make(chan *event.Event, 500)
-	w.Bridge.ChImage = make(chan []byte, 500)
 
 	http.HandleFunc(websocketUrl, w.Handler)
 	log.Println("[+] Registered websocket", websocketUrl)
