@@ -45,6 +45,11 @@ func (m *MatrixClient) ProcessActiveSessions(
 	}
 
 	userSync.SyncMutex.Lock()
+	var clientDB ClientDB = ClientDB{
+		username: m.Client.UserID.Localpart(),
+		filepath: "db/" + m.Client.UserID.Localpart() + ".db",
+	}
+	clientDB.Init()
 
 	if m.Client.AccessToken != "" && m.Client.UserID != "" && password != "" {
 		err := ks.CreateUser(m.Client.UserID.Localpart(), m.Client.AccessToken)
@@ -52,17 +57,16 @@ func (m *MatrixClient) ProcessActiveSessions(
 			return err
 		}
 
-		var clientDB ClientDB = ClientDB{
-			username: m.Client.UserID.Localpart(),
-			filepath: "db/" + m.Client.UserID.Localpart() + ".db",
-		}
-
-		clientDB.Init()
 		err = clientDB.Store(m.Client.AccessToken, password)
 
 		if err != nil {
 			return err
 		}
+	}
+
+	bridges, err := clientDB.FetchBridgeRooms(m.Client.UserID.Localpart())
+	if err != nil {
+		return err
 	}
 
 	for _, entry := range cfg.Bridges {
@@ -72,7 +76,13 @@ func (m *MatrixClient) ProcessActiveSessions(
 				Client:  m.Client,
 				BotName: config.BotName,
 			}
-			err := bridge.JoinRooms()
+			for _, _bridge := range bridges {
+				if _bridge.Name == name {
+					bridge.RoomID = _bridge.RoomID
+				}
+			}
+
+			err = bridge.JoinRooms()
 			if err != nil {
 				return err
 			}
@@ -84,7 +94,14 @@ func (m *MatrixClient) ProcessActiveSessions(
 }
 
 func (m *MatrixClient) LoadActiveSessionsByAccessToken(accessToken string) (string, error) {
-	fmt.Println("Loading active sessions: ", m.Client.UserID.Localpart(), accessToken)
+	log.Println("Loading active sessions: ", m.Client.UserID.Localpart(), accessToken)
+
+	userSync := syncingClients.Users[m.Client.UserID.Localpart()]
+	if userSync == nil {
+		return "", fmt.Errorf("user not found")
+	}
+
+	userSync.SyncMutex.Lock()
 
 	var clientDB ClientDB = ClientDB{
 		username: m.Client.UserID.Localpart(),
@@ -92,6 +109,7 @@ func (m *MatrixClient) LoadActiveSessionsByAccessToken(accessToken string) (stri
 	}
 	clientDB.Init()
 	exists, err := clientDB.AuthenticateAccessToken(m.Client.UserID.Localpart(), accessToken)
+	userSync.SyncMutex.Unlock()
 
 	if err != nil {
 		return "", err

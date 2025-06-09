@@ -121,14 +121,37 @@ func (b *Bridges) AddDevice() error {
 func (b *Bridges) JoinRooms() error {
 	var managementRoom = false
 	if b.RoomID != "" {
+		log.Println("Checking management room:", b.RoomID)
 		mngRoom, err := b.IsManagementRoom()
 		if err != nil {
 			return err
 		}
 		managementRoom = mngRoom
+		log.Println("Management room:", managementRoom)
+	} else {
+		rooms, err := b.Client.JoinedRooms(context.Background())
+		if err != nil {
+			return err
+		}
+		log.Println("Joined rooms:", rooms)
+		for _, room := range rooms.JoinedRooms {
+			tB := &Bridges{
+				Client:  b.Client,
+				RoomID:  room,
+				BotName: b.BotName,
+			}
+			mngRoom, err := tB.IsManagementRoom()
+			if err != nil {
+				return err
+			}
+			if mngRoom {
+				b.RoomID = room
+				managementRoom = true
+				break
+			}
+		}
 	}
 
-	var roomId id.RoomID
 	if !managementRoom {
 		resp, err := b.Client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
 			Invite:   []id.UserID{id.UserID(b.BotName)},
@@ -142,7 +165,7 @@ func (b *Bridges) JoinRooms() error {
 			return err
 		}
 		log.Println("[+] Created room successfully for:", b.BotName, resp.RoomID)
-		roomId = resp.RoomID
+		b.RoomID = resp.RoomID
 	}
 
 	var clientDb = ClientDB{
@@ -151,22 +174,24 @@ func (b *Bridges) JoinRooms() error {
 	}
 	clientDb.Init()
 
-	b.RoomID = roomId
-	clientDb.StoreRooms(roomId.String(), b.Name, b.BotName, true)
-	log.Println("[+] Stored room successfully for:", b.BotName, roomId)
+	clientDb.StoreRooms(b.RoomID.String(), b.Name, b.BotName, true)
+	log.Println("[+] Stored room successfully for:", b.BotName, b.RoomID)
 
 	return nil
 }
 
 func (b *Bridges) IsManagementRoom() (bool, error) {
 	members, err := b.Client.JoinedMembers(context.Background(), b.RoomID)
+	log.Println("Members:", members)
 	if err != nil {
 		return false, err
 	}
 
-	for userID, _ := range members.Joined {
-		if userID.String() == b.BotName && len(members.Joined) == 2 {
-			return true, nil
+	if len(members.Joined) == 2 {
+		for userID, _ := range members.Joined {
+			if userID.String() == b.BotName {
+				return true, nil
+			}
 		}
 	}
 
