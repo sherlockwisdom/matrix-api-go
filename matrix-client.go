@@ -369,6 +369,14 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 		)
 	}
 
+	go func() {
+		err = mc.syncIncomingMessages(userSync)
+		if err != nil {
+			log.Println("Error syncing incoming messages:", err)
+			return
+		}
+	}()
+
 	err = mc.Sync()
 
 	if err != nil {
@@ -376,5 +384,22 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 		return err
 	}
 
+	return nil
+}
+
+func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
+	log.Println("Syncing incoming messages for user:", userSync.Name)
+	bridges := userSync.Bridges
+	wg := sync.WaitGroup{}
+	for _, bridge := range bridges {
+		wg.Add(1)
+		go func(bridge *Bridges) {
+			for evt := range bridge.ChMsgEvt {
+				log.Println("Incoming message:", evt.Content.AsMessage().Body)
+			}
+			wg.Done()
+		}(bridge)
+	}
+	wg.Wait()
 	return nil
 }
