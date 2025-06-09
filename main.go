@@ -14,7 +14,6 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 	// "maunium.net/go/mautrix/id"
 )
@@ -396,10 +395,7 @@ func ApiAddDevice(c *gin.Context) {
 
 	ws := Websockets{
 		Bridge: &Bridges{
-			Client:  client,
-			Name:    platformName,
-			ChEvt:   make(chan *event.Event, 500),
-			ChImage: make(chan []byte, 500),
+			Client: client,
 		},
 	}
 

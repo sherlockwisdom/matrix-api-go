@@ -16,7 +16,7 @@ type Controller struct {
 
 type UserSync struct {
 	Name      string
-	Bridge    []*Bridges
+	Bridges   []*Bridges
 	Syncing   bool
 	SyncMutex sync.Mutex
 }

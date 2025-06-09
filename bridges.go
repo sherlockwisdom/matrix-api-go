@@ -32,7 +32,6 @@ type Bridges struct {
 }
 
 func (b *Bridges) AddDevice() error {
-
 	log.Println("Getting configs for:", b.Name)
 	if bridgeCfg, ok := cfg.GetBridgeConfig(b.Name); ok {
 		var clientDb = ClientDB{

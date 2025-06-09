@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"maunium.net/go/mautrix/event"
 )
 
 // var upgrader = websocket.Upgrader{}
@@ -62,6 +63,11 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
+
+	syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].Bridges = append(
+		syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].Bridges,
+		ws.Bridge,
+	)
 
 	var wg sync.WaitGroup
 	wg.Add(2) // Increased to 2 for the new goroutine
@@ -122,6 +128,14 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		if userSync != nil {
 			userSync.Syncing = false
 		}
+
+		// remove bridge from syncing clients
+		for index, bridge := range userSync.Bridges {
+			if bridge.Name == ws.Bridge.Name {
+				userSync.Bridges = append(userSync.Bridges[:index], userSync.Bridges[index+1:]...)
+				break
+			}
+		}
 	}()
 
 	wg.Wait()
@@ -129,6 +143,10 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 
 func (w *Websockets) RegisterWebsocket(platformName string, username string) string {
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
+
+	w.Bridge.Name = platformName
+	w.Bridge.ChEvt = make(chan *event.Event, 500)
+	w.Bridge.ChImage = make(chan []byte, 500)
 
 	http.HandleFunc(websocketUrl, w.Handler)
 	log.Println("[+] Registered websocket", websocketUrl)
