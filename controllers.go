@@ -16,9 +16,9 @@ type Controller struct {
 }
 
 var cfg, cfgError = (&Conf{}).getConf()
-var GlobalWebsocketConnection = WebsocketData{
-	ch:       make(chan []byte, 500),
-	Registry: make([]*WebsocketMap, 0),
+
+var GlobalWebsocketConnection = WebsocketController{
+	Registry: make([]*WebsocketUnit, 0),
 }
 
 var ks = Keystore{

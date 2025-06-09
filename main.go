@@ -1,15 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	_ "sherlock/matrix/docs"
 
@@ -327,7 +324,12 @@ func ApiSendMessage(c *gin.Context) {
 
 	room := Rooms{}
 
-	resp, err := room.SendRoomMessages(client, message)
+	resp, err := client.SendText(
+		context.Background(),
+		room.ID,
+		message,
+	)
+
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
@@ -376,93 +378,41 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := LoadActiveSessionsByAccessToken(username, bridgeJsonRequest.AccessToken)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
-		return
-	}
-
-	var bridge *Bridges
-	for _, _bridge := range syncingClients.Bridge[username] {
-		if _bridge.Name == platformName {
-			bridge = _bridge
-			break
-		}
-	}
-
-	if bridge == nil {
-		log.Println("Bridge not found for user:", username)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Bridge not found"})
-		return
-	}
-
-	var websocket = WebsocketData{
-		ch:     make(chan []byte, 1),
-		Bridge: bridge,
-	}
-
-	client, err := mautrix.NewClient(cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
+	client, err := mautrix.NewClient(cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
 		return
 	}
-	ProcessActiveSessions(client, username, "")
 
-	websocket.RegisterWebsocket(platformName, username)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		websocketUrl := <-websocket.ch
-
-		c.JSON(http.StatusOK, gin.H{
-			"websocket_url": string(websocketUrl),
-		})
-		defer wg.Done()
-	}()
-
-	wg.Wait()
-}
-
-func CliFlow() {
-	homeServer := cfg.HomeServer
-	password := "M4yHFt$5hW0UuyTv2hdRwtGryHa9$R7z"
-
-	client, err := mautrix.NewClient(homeServer, "", "")
+	matrixClient := MatrixClient{
+		Client: client,
+	}
+	_, err = matrixClient.LoadActiveSessionsByAccessToken(bridgeJsonRequest.AccessToken)
 	if err != nil {
-		panic(err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
+		return
 	}
 
-	var bridge = Bridges{
-		ChEvt: make(chan *event.Event, 500),
+	ws := Websockets{
+		Bridge: &Bridges{
+			Client:  client,
+			Name:    platformName,
+			ChEvt:   make(chan *event.Event, 500),
+			ChImage: make(chan []byte, 500),
+		},
 	}
-	switch os.Args[1] {
-	case "--create":
-		username := "sherlock_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
-		err := CreateProcess(
-			client,
-			username,
-			password,
-		)
 
-		if err != nil {
-			panic(err)
-		}
-	case "--login":
-		username := os.Args[2]
-		LoginProcess(client, username, password)
-	case "--websocket":
-		var wd = WebsocketData{ch: make(chan []byte, 1)}
-		wd.ch <- []byte("may the force!")
-		err := MainWebsocket(false)
-		if err != nil {
-			panic(err)
-		}
-		os.Exit(0)
-	default:
+	websocketUrl := ""
+	if index := GetWebsocketIndex(username, platformName); index > -1 {
+		websocketUrl = GlobalWebsocketConnection.Registry[index].Url
+	} else {
+		websocketUrl = ws.RegisterWebsocket(platformName, username)
 	}
-	CompleteRun(client, &bridge)
+
+	c.JSON(http.StatusOK, gin.H{
+		"websocket_url": string(websocketUrl),
+	})
 }
 
 // @title           ShortMesh API
@@ -472,10 +422,6 @@ func CliFlow() {
 func main() {
 	if cfgError != nil {
 		panic(cfgError)
-	}
-
-	if len(os.Args) > 1 {
-		CliFlow()
 	}
 
 	router := gin.Default()
@@ -527,7 +473,7 @@ func main() {
 	}()
 
 	go func() {
-		err := SyncAllClients()
+		err := (&MatrixClient{}).SyncAllClients()
 		if err != nil {
 			panic(err)
 		}

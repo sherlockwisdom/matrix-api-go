@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"slices"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -21,21 +20,19 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type WebsocketDataInterface interface {
-	Handler(http.ResponseWriter, *http.Request)
+type Websockets struct {
+	Bridge *Bridges
 }
 
-type WebsocketData struct {
-	ch       chan []byte
-	Bridge   *Bridges
-	Registry []*WebsocketMap
+type WebsocketController struct {
+	Registry []*WebsocketUnit
 }
 
-type WebsocketMap struct {
+type WebsocketUnit struct {
 	Url          string
 	PlatformName string
 	Username     string
-	Websocket    *WebsocketData
+	Websocket    *Websockets
 }
 
 func GetWebsocketUsernameIndex(username string) int {
@@ -57,8 +54,8 @@ func GetWebsocketIndex(username string, platformName string) int {
 	return -1
 }
 
-func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
-	// log.Printf("Websocket handler called %s %p\n", wd.Bridge.Client.UserID, wd.Bridge.ChEvt)
+func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Websocket handler called", ws.Bridge.Client.UserID)
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
@@ -68,17 +65,15 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(c *websocket.Conn) {
-		log.Printf("Websocket handler called %s %p\n", wd.Bridge.Client.UserID, wd.Bridge.ChEvt)
 		defer wg.Done()
 		for {
-			data := <-wd.Bridge.ChImage
+			data := <-ws.Bridge.ChImage
 			fmt.Println(data)
 			if data == nil {
 				return
 			}
 
-			fmt.Println("Websocket sending message for:", wd.Bridge.Client.UserID)
-			// err := conn.WriteMessage(websocket.TextMessage, []byte("Websocket image"))
+			fmt.Println("Websocket sending message for:", ws.Bridge.Client.UserID)
 
 			if c == nil {
 				log.Println("Error connecting socket, client is nil")
@@ -86,7 +81,6 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			err := c.WriteMessage(websocket.BinaryMessage, data)
-			// err := conn.WriteMessage(websocket.TextMessage, data)
 			if err != nil {
 				log.Println("Error sending message to client socket", err)
 				return
@@ -94,57 +88,32 @@ func (wd *WebsocketData) Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}(conn)
 
-	err = wd.Bridge.AddDevice()
+	err = ws.Bridge.AddDevice()
 	if err != nil {
 		log.Printf("Failed to add device: %v", err)
 		return
 	}
 
 	defer func() {
-		// if index := GetWebsocketIndex(wd.Bridge.Client.UserID.Localpart(), wd.Bridge.Name); index > -1 {
-		// 	GlobalWebsocketConnection.Registry =
-		// 		slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-		// 	log.Println("Deleting websocket map at", index)
-		// }
-		log.Println("Falsifying syncing clients for user:", wd.Bridge.Client.UserID.Localpart())
-		syncingClients.Registry[wd.Bridge.Client.UserID.Localpart()] = false
+		log.Println("Falsifying syncing clients for user:", ws.Bridge.Client.UserID.Localpart())
+		syncingClients.Registry[ws.Bridge.Client.UserID.Localpart()] = false
 	}()
 
 	wg.Wait()
 }
 
-func (wd *WebsocketData) RegisterWebsocket(platformName string, username string) {
+func (w *Websockets) RegisterWebsocket(platformName string, username string) string {
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 
-	if wd.Bridge.Client == nil {
-		log.Println("Client is nil, skipping websocket registration")
-		return
-	}
-
-	if index := GetWebsocketIndex(username, platformName); index > -1 {
-		log.Println("[+] Incoming socket connection but one already exist", wd.Bridge.Client.UserID)
-
-		if !syncingClients.Registry[wd.Bridge.Client.UserID.Localpart()] {
-			delete(syncingClients.Bridge, wd.Bridge.Client.UserID.Localpart())
-			log.Println("Deleting syncing clients for user:", wd.Bridge.Client.UserID.Localpart())
-			return
-		}
-
-		GlobalWebsocketConnection.Registry =
-			slices.Delete(GlobalWebsocketConnection.Registry, index, index+1)
-		wd.Bridge.Name = platformName
-		log.Println("[+] Deleted socket at index", index)
-	} else {
-		http.HandleFunc(websocketUrl, wd.Handler)
-		log.Println("[+] Registered websocket", websocketUrl)
-	}
-	GlobalWebsocketConnection.Registry = append(GlobalWebsocketConnection.Registry, &WebsocketMap{
+	http.HandleFunc(websocketUrl, w.Handler)
+	log.Println("[+] Registered websocket", websocketUrl)
+	GlobalWebsocketConnection.Registry = append(GlobalWebsocketConnection.Registry, &WebsocketUnit{
 		Url:          websocketUrl,
 		PlatformName: platformName,
 		Username:     username,
-		Websocket:    wd,
+		Websocket:    w,
 	})
-	wd.ch <- []byte(websocketUrl)
+	return websocketUrl
 }
 
 func MainWebsocket(tls bool) error {

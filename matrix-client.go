@@ -54,12 +54,12 @@ func (m *MatrixClient) ProcessActiveSessions(
 	}
 
 	for _, entry := range cfg.Bridges {
-		for name, config := range entry {
+		for name, _ := range entry {
 			bridge := Bridges{
 				Name:   name,
 				Client: m.Client,
 			}
-			err := bridge.JoinRooms(m.Client.UserID.Localpart(), config.BotName)
+			err := bridge.JoinRooms(m.Client.UserID.Localpart())
 			if err != nil {
 				return err
 			}
@@ -69,18 +69,15 @@ func (m *MatrixClient) ProcessActiveSessions(
 	return nil
 }
 
-func LoadActiveSessionsByAccessToken(
-	username string,
-	accessToken string,
-) (string, error) {
-	fmt.Println("Loading active sessions: ", username, accessToken)
+func (m *MatrixClient) LoadActiveSessionsByAccessToken(accessToken string) (string, error) {
+	fmt.Println("Loading active sessions: ", m.Client.UserID.Localpart(), accessToken)
 
 	var clientDB ClientDB = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
+		username: m.Client.UserID.Localpart(),
+		filepath: "db/" + m.Client.UserID.Localpart() + ".db",
 	}
 	clientDB.Init()
-	exists, err := clientDB.AuthenticateAccessToken(username, accessToken)
+	exists, err := clientDB.AuthenticateAccessToken(m.Client.UserID.Localpart(), accessToken)
 
 	if err != nil {
 		return "", err
@@ -140,7 +137,7 @@ func (m *MatrixClient) Login(username string, password string) (string, error) {
 		return "", err
 	}
 
-	err = m.ProcessActiveSessions(username, password)
+	err = m.ProcessActiveSessions(password)
 	if err != nil {
 		return "", err
 	}
@@ -193,18 +190,15 @@ func (m *MatrixClient) Sync(
 	syncer := mautrix.NewDefaultSyncer()
 	m.Client.Syncer = syncer
 
-	// TODO: multiple sync for the same client makes it fail
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		// log.Println("[Sync] Event:", evt)
-		// bridge.ChEvt <- evt
-		// bridge.GetInvites(client, evt)
 		for _, bridge := range bridges {
+			bridge.Client = m.Client
 			go func() {
 				bridge.ChEvt <- evt
 			}()
 
 			go func() {
-				bridge.GetInvites(m.Client, evt)
+				bridge.GetInvites(evt)
 			}()
 		}
 	})
@@ -217,39 +211,42 @@ func (m *MatrixClient) Sync(
 }
 
 func (b *Bridges) GetInvites(
-	client *mautrix.Client,
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
-		log.Println("[+] Getting invites for: ", b.Room.ID)
-		if evt.StateKey != nil && *evt.StateKey == client.UserID.String() {
+		log.Println("[+] Getting invites for: ", b.RoomID)
+		if evt.StateKey != nil && *evt.StateKey == b.Client.UserID.String() {
 			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
-			err := b.Room.Join(client, evt.RoomID)
+			_, err := b.Client.JoinRoomByID(context.Background(), evt.RoomID)
 			if err != nil {
 				return err
 			}
 
-			if isBridge, err := b.Room.IsBridgeInviteForContact(evt); isBridge {
+			room := Rooms{
+				Client: b.Client,
+				ID:     evt.RoomID,
+			}
+			if isBridge, err := room.IsBridgeInviteForContact(evt); isBridge {
 				log.Println("Bridge message handled -", evt.RoomID)
 				log.Println(err)
 
 				var clientDB ClientDB = ClientDB{
-					username: b.Room.User.Username,
-					filepath: "db/" + b.Room.User.Username + ".db",
+					username: b.Client.UserID.Localpart(),
+					filepath: "db/" + b.Client.UserID.Localpart() + ".db",
 				}
 
-				roomName := evt.Content.AsMember().Displayname
+				roomName := *evt.StateKey
 				log.Println("roomName:", roomName)
 
 				clientDB.Init()
-				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, int(RoomTypeContact), false)
+				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, false)
 			}
 		}
 	}
 	return nil
 }
 
-func SyncAllClients() error {
+func (m *MatrixClient) SyncAllClients() error {
 	log.Println("Syncing all clients")
 	var wg sync.WaitGroup
 	for {
@@ -280,6 +277,9 @@ func SyncAllClients() error {
 					id.NewUserID(user.Username, cfg.HomeServerDomain),
 					user.AccessToken,
 				)
+				mc := MatrixClient{
+					Client: client,
+				}
 				if err != nil {
 					log.Println("Error creating bridge for user:", err, user.Username)
 					return
@@ -295,12 +295,12 @@ func SyncAllClients() error {
 
 				for _, bridge := range bridges {
 					bridge.Client = client
-					bridge.JoinRooms(user.Username, bridge.Room.Members[bridge.Name])
+					bridge.JoinRooms(user.Username)
 				}
 				syncingClients.Registry[user.Username] = true
 				syncingClients.Bridge[user.Username] = bridges
 
-				err = Sync(client, bridges)
+				err = mc.Sync(bridges)
 				if err != nil {
 					log.Println("Sync error for user:", err, client.UserID.String())
 				}

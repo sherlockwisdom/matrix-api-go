@@ -24,7 +24,8 @@ type BridgesInterface interface {
 
 type Bridges struct {
 	Name    string
-	Room    Rooms
+	BotName string
+	RoomID  id.RoomID
 	Client  *mautrix.Client
 	ChEvt   chan *event.Event
 	ChImage chan []byte
@@ -48,18 +49,6 @@ func (b *Bridges) AddDevice() error {
 			return err
 		}
 
-		var room Rooms
-		for _, bridge := range syncingClients.Bridge[b.Client.UserID.Localpart()] {
-			if bridge.Name == b.Name {
-				room = bridge.Room
-				break
-			}
-		}
-
-		if room.ID == "" {
-			return fmt.Errorf("room not found for bridge: %s", b.Name)
-		}
-
 		var wg sync.WaitGroup
 		if loginCmd, exists := bridgeCfg.Cmd["login"]; exists {
 			wg.Add(1)
@@ -67,12 +56,10 @@ func (b *Bridges) AddDevice() error {
 				since := time.Now().UnixMilli()
 				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChEvt)
 				for evt := range b.ChEvt {
-					if evt.RoomID == b.Room.ID &&
+					if evt.RoomID == b.RoomID &&
 						evt.Sender != b.Client.UserID &&
 						evt.Timestamp >= since &&
 						evt.Type == event.EventMessage {
-
-						log.Println("Event:", evt)
 
 						failedCmd := bridgeCfg.Cmd["failed"]
 						matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
@@ -104,20 +91,20 @@ func (b *Bridges) AddDevice() error {
 						}
 					}
 				}
+
 				_, err = b.Client.SendText(
 					context.Background(),
-					id.RoomID(b.Room.ID),
+					b.RoomID,
 					bridgeCfg.Cmd["cancel"],
 				)
 
 				defer wg.Done()
 			}()
 
-			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.Room.ID)
-
+			log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.RoomID)
 			_, err = b.Client.SendText(
 				context.Background(),
-				id.RoomID(b.Room.ID),
+				b.RoomID,
 				loginCmd,
 			)
 
@@ -131,11 +118,8 @@ func (b *Bridges) AddDevice() error {
 	return err
 }
 
-func (b *Bridges) JoinRooms(
-	username string,
-	botName string,
-) error {
-	clientRooms, err := b.Room.JoinedRooms(b.Client)
+func (b *Bridges) JoinRooms(username string) error {
+	clientRooms, err := b.Client.JoinedRooms(context.Background())
 	if err != nil {
 		return err
 	}
@@ -149,8 +133,8 @@ func (b *Bridges) JoinRooms(
 
 	managementRoom := false
 	var roomId id.RoomID
-	for _, clientRoom := range clientRooms {
-		managementRoom, err = b.IsManagementRoom(botName, clientRoom)
+	for _, clientRoom := range clientRooms.JoinedRooms {
+		managementRoom, err = b.IsManagementRoom()
 		if err != nil {
 			return err
 		}
@@ -161,30 +145,38 @@ func (b *Bridges) JoinRooms(
 		}
 
 	}
+
 	if !managementRoom {
-		roomId, err := b.Room.CreateRoom(
-			b.Client, b.Name, botName, RoomTypeManagement, true,
-		)
+		resp, err := b.Client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
+			Invite:   []id.UserID{id.UserID(username)},
+			IsDirect: true,
+			// Preset:     "private_chat",
+			Preset:     "trusted_private_chat",
+			Visibility: "private",
+		})
+
 		if err != nil {
 			return err
 		}
-		log.Println("[+] Created room successfully for:", botName, roomId)
+		roomId = resp.RoomID
+		log.Println("[+] Created room successfully for:", b.BotName, resp.RoomID)
 	}
-	b.Room.ID = roomId
-	clientDb.StoreRooms(roomId.String(), b.Name, botName, int(RoomTypeManagement), true)
-	log.Println("[+] Stored room successfully for:", botName, roomId)
+
+	b.RoomID = roomId
+	clientDb.StoreRooms(roomId.String(), b.Name, b.BotName, true)
+	log.Println("[+] Stored room successfully for:", b.BotName, roomId)
 
 	return nil
 }
 
-func (b *Bridges) IsManagementRoom(bridgeBotName string, roomId id.RoomID) (bool, error) {
-	members, err := b.Room.GetRoomMembers(b.Client, roomId)
+func (b *Bridges) IsManagementRoom() (bool, error) {
+	members, err := b.Client.JoinedMembers(context.Background(), b.RoomID)
 	if err != nil {
 		return false, err
 	}
 
-	for _, member := range members {
-		if member.String() == bridgeBotName && len(members) == 2 {
+	for userID, _ := range members.Joined {
+		if userID.String() == b.BotName && len(members.Joined) == 2 {
 			return true, nil
 		}
 	}

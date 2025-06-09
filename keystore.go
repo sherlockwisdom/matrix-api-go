@@ -137,7 +137,6 @@ func (clientDb *ClientDB) Init() error {
 	roomID TEXT NOT NULL,
 	name TEXT NOT NULL,
 	members TEXT NOT NULL,
-	type INTEGER NOT NULL,
 	isBridge INTEGER NOT NULL,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -244,17 +243,16 @@ func (clientDb *ClientDB) StoreRooms(
 	roomID string,
 	platformName string,
 	members string,
-	_type int,
 	isBridge bool,
 ) error {
-	log.Println("[+] Storing to rooms:", roomID, platformName, members, _type, isBridge)
+	log.Println("[+] Storing to rooms:", roomID, platformName, members, isBridge)
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err
 	}
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO rooms (clientUsername, roomID, name, members, type, isBridge) values(?,?,?,?,?,?)`,
+		`INSERT INTO rooms (clientUsername, roomID, name, members, isBridge) values(?,?,?,?,?)`,
 	)
 	if err != nil {
 		return err
@@ -262,7 +260,7 @@ func (clientDb *ClientDB) StoreRooms(
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(clientDb.username, roomID, platformName, members, _type, isBridge)
+	_, err = stmt.Exec(clientDb.username, roomID, platformName, members, isBridge)
 	if err != nil {
 		return err
 	}
@@ -301,8 +299,6 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 
 	var room = Rooms{
 		ID:       id.RoomID(_roomID),
-		Channel:  make(chan *event.Event),
-		Type:     RoomType(_type),
 		isBridge: isBridge,
 		Members: map[string]string{
 			name: members,
@@ -339,8 +335,6 @@ func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
 
 	var room = Rooms{
 		ID:       id.RoomID(_roomID),
-		Channel:  make(chan *event.Event),
-		Type:     RoomType(_type),
 		isBridge: isBridge,
 		Members: map[string]string{
 			_name: members,
@@ -353,7 +347,7 @@ func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
 func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) {
 	log.Println("Fetching bridge rooms for", username, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, type, isBridge from rooms where clientUsername = ? and isBridge = 1",
+		"select clientUsername, roomID, name, members, isBridge from rooms where clientUsername = ? and isBridge = 1",
 	)
 	if err != nil {
 		return []*Bridges{}, err
@@ -374,27 +368,19 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 		var _roomID string
 		var name string
 		var members string
-		var _type int
 		var isBridge bool
 
-		err = rows.Scan(&clientUsername, &_roomID, &name, &members, &_type, &isBridge)
+		err = rows.Scan(&clientUsername, &_roomID, &name, &members, &isBridge)
 		if err != nil {
 			return []*Bridges{}, err
 		}
 
 		bridges = append(bridges, &Bridges{
-			ChEvt:   make(chan *event.Event, 500),
+			ChEvt:   make(chan *event.Event, 1),
 			ChImage: make(chan []byte, 1),
-			Room: Rooms{
-				ID:       id.RoomID(_roomID),
-				Channel:  make(chan *event.Event),
-				Type:     RoomType(_type),
-				isBridge: isBridge,
-				Members: map[string]string{
-					name: members,
-				},
-			},
-			Name: name,
+			RoomID:  id.RoomID(_roomID),
+			Name:    name,
+			BotName: members,
 		})
 	}
 
