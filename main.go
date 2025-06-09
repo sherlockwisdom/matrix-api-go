@@ -197,6 +197,7 @@ func ApiLogin(c *gin.Context) {
 	controller := Controller{
 		Client:   client,
 		Username: username,
+		UserID:   client.UserID,
 	}
 	if err := controller.LoginProcess(password); err != nil {
 		log.Printf("Login failed for %s: %v", username, err)
@@ -246,6 +247,7 @@ func ApiCreate(c *gin.Context) {
 	homeServer := cfg.HomeServer
 
 	client, err := mautrix.NewClient(homeServer, "", "")
+
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})

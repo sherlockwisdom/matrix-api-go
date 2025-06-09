@@ -14,8 +14,7 @@ import (
 )
 
 type SyncingClients struct {
-	Bridge   map[string][]*Bridges
-	Registry map[string]bool
+	Users map[string]*UserSync
 }
 
 type ClientDB struct {
@@ -34,8 +33,21 @@ This function adds the user to the database and joins the bridge rooms
 func (m *MatrixClient) ProcessActiveSessions(
 	password string,
 ) error {
+	userSync := syncingClients.Users[m.Client.UserID.Localpart()]
+	if userSync == nil {
+		userSync = &UserSync{
+			Name:      m.Client.UserID.Localpart(),
+			Bridge:    make([]*Bridges, 0),
+			Syncing:   false,
+			SyncMutex: sync.Mutex{},
+		}
+		syncingClients.Users[m.Client.UserID.Localpart()] = userSync
+	}
+
+	userSync.SyncMutex.Lock()
+
 	if m.Client.AccessToken != "" && m.Client.UserID != "" && password != "" {
-		err := ks.CreateUser(m.Client.UserID.String(), m.Client.AccessToken)
+		err := ks.CreateUser(m.Client.UserID.Localpart(), m.Client.AccessToken)
 		if err != nil {
 			return err
 		}
@@ -44,8 +56,8 @@ func (m *MatrixClient) ProcessActiveSessions(
 			username: m.Client.UserID.Localpart(),
 			filepath: "db/" + m.Client.UserID.Localpart() + ".db",
 		}
-		clientDB.Init()
 
+		clientDB.Init()
 		err = clientDB.Store(m.Client.AccessToken, password)
 
 		if err != nil {
@@ -54,18 +66,20 @@ func (m *MatrixClient) ProcessActiveSessions(
 	}
 
 	for _, entry := range cfg.Bridges {
-		for name, _ := range entry {
+		for name, config := range entry {
 			bridge := Bridges{
-				Name:   name,
-				Client: m.Client,
+				Name:    name,
+				Client:  m.Client,
+				BotName: config.BotName,
 			}
-			err := bridge.JoinRooms(m.Client.UserID.Localpart())
+			err := bridge.JoinRooms()
 			if err != nil {
 				return err
 			}
 		}
 	}
 
+	defer userSync.SyncMutex.Unlock()
 	return nil
 }
 
@@ -114,11 +128,11 @@ func (m *MatrixClient) LoadActiveSessions(
 }
 
 func (m *MatrixClient) Login(password string) (string, error) {
-	fmt.Printf("Login in as %s\n", m.Client.UserID.Localpart())
+	log.Printf("Login in as %s\n", m.Client.UserID.String())
 
 	identifier := mautrix.UserIdentifier{
 		Type: "m.id.user",
-		User: m.Client.UserID.Localpart(),
+		User: m.Client.UserID.String(),
 	}
 
 	resp, err := m.Client.Login(context.Background(), &mautrix.ReqLogin{
@@ -129,11 +143,7 @@ func (m *MatrixClient) Login(password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	err = m.ProcessActiveSessions(password)
-	if err != nil {
-		return "", err
-	}
+	m.Client.AccessToken = resp.AccessToken
 
 	return resp.AccessToken, nil
 }
@@ -171,7 +181,7 @@ func (m *MatrixClient) Create(username string, password string) (string, error) 
 	})
 
 	if err != nil {
-		return resp.AccessToken, err
+		return "", err
 	}
 
 	return resp.AccessToken, nil
@@ -197,7 +207,6 @@ func (m *MatrixClient) Sync(
 	})
 
 	if err := m.Client.Sync(); err != nil {
-		log.Println("Sync error for user:", err, m.Client.UserID.String())
 		return err
 	}
 	return nil
@@ -251,19 +260,23 @@ func (m *MatrixClient) SyncAllClients() error {
 
 		// TODO: make this multi-threaded
 		for _, user := range users {
-			if syncingClients.Registry[user.Username] {
+			userSync := syncingClients.Users[user.Username]
+			if userSync == nil {
+				userSync = &UserSync{
+					Name:      user.Username,
+					Bridge:    make([]*Bridges, 0),
+					Syncing:   false,
+					SyncMutex: sync.Mutex{},
+				}
+				syncingClients.Users[user.Username] = userSync
+			}
+			if userSync.Syncing {
 				continue
 			}
-
-			clientDb := ClientDB{
-				username: user.Username,
-				filepath: "db/" + user.Username + ".db",
-			}
-			clientDb.Init()
-
-			log.Printf("Syncing %d clients", len(syncingClients.Bridge)+1)
+			log.Printf("Syncing %d clients", len(userSync.Bridge)+1)
 			wg.Add(1)
 			go func(user Users) {
+				log.Println("Syncing user:", user.Username, user.AccessToken)
 				homeServer := cfg.HomeServer
 				client, err := mautrix.NewClient(
 					homeServer,
@@ -278,32 +291,43 @@ func (m *MatrixClient) SyncAllClients() error {
 					return
 				}
 
-				// cfgBridges := cfg.GetBridges()
+				clientDb := ClientDB{
+					username: user.Username,
+					filepath: "db/" + user.Username + ".db",
+				}
 
+				userSync.SyncMutex.Lock()
+				clientDb.Init()
 				bridges, err := clientDb.FetchBridgeRooms(user.Username)
+				userSync.SyncMutex.Unlock()
+
+				log.Println("Bridges:", bridges)
+				if len(bridges) == 0 {
+					log.Println("No bridges found for user:", user.Username)
+					return
+				}
+
 				if err != nil {
 					log.Println("Error fetching bridge rooms for user:", err, user.Username)
 					return
 				}
 
-				for _, bridge := range bridges {
-					bridge.Client = client
-					bridge.JoinRooms(user.Username)
-				}
-				syncingClients.Registry[user.Username] = true
-				syncingClients.Bridge[user.Username] = bridges
+				// for _, bridge := range bridges {
+				// 	bridge.Client = client
+				// 	bridge.JoinRooms()
+				// }
+				userSync.Syncing = true
+				// syncingClients.Bridge[user.Username] = bridges
 
 				err = mc.Sync(bridges)
 				if err != nil {
 					log.Println("Sync error for user:", err, client.UserID.String())
 				}
 
-				defer func() {
-					delete(syncingClients.Registry, user.Username)
-					delete(syncingClients.Bridge, user.Username)
-					log.Println("Deleted syncing for user:", user.Username)
-					wg.Done()
-				}()
+				userSync.Syncing = false
+				delete(syncingClients.Users, user.Username)
+				log.Println("Deleted syncing for user:", user.Username)
+				wg.Done()
 			}(user)
 		}
 		time.Sleep(3 * time.Second)

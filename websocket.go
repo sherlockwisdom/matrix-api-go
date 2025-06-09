@@ -96,7 +96,10 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		log.Println("Falsifying syncing clients for user:", ws.Bridge.Client.UserID.Localpart())
-		syncingClients.Registry[ws.Bridge.Client.UserID.Localpart()] = false
+		userSync := syncingClients.Users[ws.Bridge.Client.UserID.Localpart()]
+		if userSync != nil {
+			userSync.Syncing = false
+		}
 	}()
 
 	wg.Wait()

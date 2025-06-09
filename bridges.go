@@ -118,37 +118,20 @@ func (b *Bridges) AddDevice() error {
 	return err
 }
 
-func (b *Bridges) JoinRooms(username string) error {
-	clientRooms, err := b.Client.JoinedRooms(context.Background())
-	if err != nil {
-		return err
-	}
-	log.Println("Client Rooms: ", clientRooms)
-
-	var clientDb = ClientDB{
-		username: b.Client.UserID.Localpart(),
-		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
-	}
-	clientDb.Init()
-
-	managementRoom := false
-	var roomId id.RoomID
-	for _, clientRoom := range clientRooms.JoinedRooms {
-		managementRoom, err = b.IsManagementRoom()
+func (b *Bridges) JoinRooms() error {
+	var managementRoom = false
+	if b.RoomID != "" {
+		mngRoom, err := b.IsManagementRoom()
 		if err != nil {
 			return err
 		}
-		roomId = clientRoom
-
-		if managementRoom {
-			break
-		}
-
+		managementRoom = mngRoom
 	}
 
+	var roomId id.RoomID
 	if !managementRoom {
 		resp, err := b.Client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
-			Invite:   []id.UserID{id.UserID(username)},
+			Invite:   []id.UserID{id.UserID(b.BotName)},
 			IsDirect: true,
 			// Preset:     "private_chat",
 			Preset:     "trusted_private_chat",
@@ -158,9 +141,15 @@ func (b *Bridges) JoinRooms(username string) error {
 		if err != nil {
 			return err
 		}
-		roomId = resp.RoomID
 		log.Println("[+] Created room successfully for:", b.BotName, resp.RoomID)
+		roomId = resp.RoomID
 	}
+
+	var clientDb = ClientDB{
+		username: b.Client.UserID.Localpart(),
+		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+	}
+	clientDb.Init()
 
 	b.RoomID = roomId
 	clientDb.StoreRooms(roomId.String(), b.Name, b.BotName, true)

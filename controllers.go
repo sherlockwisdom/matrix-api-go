@@ -11,6 +11,14 @@ import (
 type Controller struct {
 	Client   *mautrix.Client
 	Username string
+	UserID   id.UserID
+}
+
+type UserSync struct {
+	Name      string
+	Bridge    []*Bridges
+	Syncing   bool
+	SyncMutex sync.Mutex
 }
 
 var cfg, cfgError = (&Conf{}).getConf()
@@ -31,13 +39,9 @@ var ks = Keystore{
 	filepath: cfg.KeystoreFilepath,
 }
 
-var (
-	syncingClients = SyncingClients{
-		Bridge:   make(map[string][]*Bridges),
-		Registry: make(map[string]bool),
-	}
-	mapMutex = sync.Mutex{}
-)
+var syncingClients = SyncingClients{
+	Users: make(map[string]*UserSync),
+}
 
 func (c *Controller) CreateProcess(password string) error {
 	m := MatrixClient{
@@ -80,22 +84,6 @@ func (c *Controller) LoginProcess(password string) error {
 	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (c *Controller) ConfigureGlobalController() error {
-	m := MatrixClient{
-		Client: c.Client,
-	}
-
-	if accessToken, err := m.Login(cfg.User.Password); err != nil {
-		return err
-	} else {
-		c.Client.AccessToken = accessToken
-	}
-
-	GlobalController.Client = c.Client
 
 	return nil
 }
