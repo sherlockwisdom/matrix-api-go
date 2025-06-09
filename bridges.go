@@ -32,14 +32,9 @@ type Bridges struct {
 }
 
 func (b *Bridges) AddDevice() error {
-	conf, err := (&Conf{}).getConf()
-
-	if err != nil {
-		return err
-	}
 
 	log.Println("Getting configs for:", b.Name)
-	if bridgeCfg, ok := conf.GetBridgeConfig(b.Name); ok {
+	if bridgeCfg, ok := cfg.GetBridgeConfig(b.Name); ok {
 		var clientDb = ClientDB{
 			username: b.Client.UserID.Localpart(),
 			filepath: "db/" + b.Client.UserID.Localpart() + ".db",
@@ -52,6 +47,23 @@ func (b *Bridges) AddDevice() error {
 		var wg sync.WaitGroup
 		if loginCmd, exists := bridgeCfg.Cmd["login"]; exists {
 			wg.Add(1)
+
+			bridges, err := clientDb.FetchBridgeRooms(b.Client.UserID.Localpart())
+			if err != nil {
+				return err
+			}
+
+			for _, bridge := range bridges {
+				if bridge.Name == b.Name {
+					b.RoomID = bridge.RoomID
+					break
+				}
+			}
+
+			if b.RoomID == "" {
+				return fmt.Errorf("room not found for bridge: %s", b.Name)
+			}
+
 			go func() {
 				since := time.Now().UnixMilli()
 				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChEvt)
@@ -92,12 +104,6 @@ func (b *Bridges) AddDevice() error {
 					}
 				}
 
-				_, err = b.Client.SendText(
-					context.Background(),
-					b.RoomID,
-					bridgeCfg.Cmd["cancel"],
-				)
-
 				defer wg.Done()
 			}()
 
@@ -115,7 +121,7 @@ func (b *Bridges) AddDevice() error {
 		}
 		wg.Wait()
 	}
-	return err
+	return nil
 }
 
 func (b *Bridges) JoinRooms() error {

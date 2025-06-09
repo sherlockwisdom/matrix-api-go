@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -63,7 +64,28 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2) // Increased to 2 for the new goroutine
+
+	// Add connection monitoring goroutine
+	go func(c *websocket.Conn) {
+		defer wg.Done()
+		for {
+			_, _, err := c.ReadMessage()
+			if err != nil {
+				log.Printf("Client connection lost for user %s: %v", ws.Bridge.Client.UserID, err)
+				if bridgeCfg, ok := cfg.GetBridgeConfig(ws.Bridge.Name); ok {
+					log.Println("Sending cancel command to:", ws.Bridge.RoomID)
+					_, err = ws.Bridge.Client.SendText(
+						context.Background(),
+						ws.Bridge.RoomID,
+						bridgeCfg.Cmd["cancel"],
+					)
+				}
+				break
+			}
+		}
+	}(conn)
+
 	go func(c *websocket.Conn) {
 		defer wg.Done()
 		for {
@@ -82,7 +104,7 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 
 			err := c.WriteMessage(websocket.BinaryMessage, data)
 			if err != nil {
-				log.Println("Error sending message to client socket", err)
+				log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
 				return
 			}
 		}
