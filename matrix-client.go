@@ -93,7 +93,7 @@ func (m *MatrixClient) LoadActiveSessionsByAccessToken(accessToken string) (stri
 func (m *MatrixClient) LoadActiveSessions(
 	password string,
 ) (string, error) {
-	fmt.Println("Loading active sessions: ", m.Client.UserID.Localpart(), password)
+	log.Println("Loading active sessions: ", m.Client.UserID.Localpart(), password)
 
 	var clientDB ClientDB = ClientDB{
 		username: m.Client.UserID.Localpart(),
@@ -107,29 +107,22 @@ func (m *MatrixClient) LoadActiveSessions(
 	}
 
 	if !exists {
-		return "", fmt.Errorf("user does not exist")
+		return "", nil
 	}
 
 	return clientDB.Fetch()
 }
 
-func (m *MatrixClient) Login(username string, password string) (string, error) {
-	fmt.Printf("Login in as %s\n", username)
-
-	var clientDB ClientDB = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDB.Init()
+func (m *MatrixClient) Login(password string) (string, error) {
+	fmt.Printf("Login in as %s\n", m.Client.UserID.Localpart())
 
 	identifier := mautrix.UserIdentifier{
 		Type: "m.id.user",
-		User: username,
+		User: m.Client.UserID.Localpart(),
 	}
 
 	resp, err := m.Client.Login(context.Background(), &mautrix.ReqLogin{
-		Type: "m.login.password",
-		// User:     id.UserID(username),
+		Type:       "m.login.password",
 		Identifier: identifier,
 		Password:   password,
 	})

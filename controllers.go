@@ -9,16 +9,22 @@ import (
 )
 
 type Controller struct {
-	Client      *mautrix.Client
-	Username    string
-	Password    string
-	AccessToken string
+	Client   *mautrix.Client
+	Username string
 }
 
 var cfg, cfgError = (&Conf{}).getConf()
 
 var GlobalWebsocketConnection = WebsocketController{
 	Registry: make([]*WebsocketUnit, 0),
+}
+
+var GlobalController = Controller{
+	Client: &mautrix.Client{
+		UserID:      id.NewUserID(cfg.User.Username, cfg.HomeServerDomain),
+		AccessToken: cfg.User.AccessToken,
+	},
+	Username: cfg.User.Username,
 }
 
 var ks = Keystore{
@@ -33,11 +39,11 @@ var (
 	mapMutex = sync.Mutex{}
 )
 
-func (c *Controller) CreateProcess() error {
+func (c *Controller) CreateProcess(password string) error {
 	m := MatrixClient{
 		Client: c.Client,
 	}
-	accessToken, err := m.Create(c.Username, c.Password)
+	accessToken, err := m.Create(c.Username, password)
 
 	if err != nil {
 		return err
@@ -47,33 +53,49 @@ func (c *Controller) CreateProcess() error {
 	c.Client.AccessToken = accessToken
 	log.Println("[+] Created user: ", c.Username)
 
-	err = m.ProcessActiveSessions(c.Password)
+	err = m.ProcessActiveSessions(password)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Controller) LoginProcess() error {
+func (c *Controller) LoginProcess(password string) error {
 	m := MatrixClient{
 		Client: c.Client,
 	}
-	accessToken, err := m.LoadActiveSessions(c.Password)
+	accessToken, err := m.LoadActiveSessions(password)
 	if err != nil {
 		return err
 	}
 
 	if accessToken == "" {
-		if accessToken, err = m.Login(c.Username, c.Password); err != nil {
+		if accessToken, err = m.Login(password); err != nil {
 			return err
 		}
 	}
 
 	c.Client.AccessToken = accessToken
-	err = m.ProcessActiveSessions(c.Password)
+	err = m.ProcessActiveSessions(password)
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (c *Controller) ConfigureGlobalController() error {
+	m := MatrixClient{
+		Client: c.Client,
+	}
+
+	if accessToken, err := m.Login(cfg.User.Password); err != nil {
+		return err
+	} else {
+		c.Client.AccessToken = accessToken
+	}
+
+	GlobalController.Client = c.Client
 
 	return nil
 }

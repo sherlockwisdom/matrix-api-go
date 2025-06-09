@@ -172,6 +172,10 @@ func (clientDb *ClientDB) Authenticate(username string, password string) (bool, 
 	var count int
 	err := clientDb.connection.QueryRow(query, username, password).Scan(&count)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("[-] Authentication failed for user: %s", username)
+			return false, nil
+		}
 		return false, fmt.Errorf("authentication query failed: %w", err)
 	}
 
