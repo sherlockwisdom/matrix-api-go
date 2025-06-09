@@ -126,14 +126,12 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Falsifying syncing clients for user:", ws.Bridge.Client.UserID.Localpart())
 		userSync := syncingClients.Users[ws.Bridge.Client.UserID.Localpart()]
 		if userSync != nil {
-			userSync.Syncing = false
-		}
-
-		// remove bridge from syncing clients
-		for index, bridge := range userSync.Bridges {
-			if bridge.Name == ws.Bridge.Name {
-				userSync.Bridges = append(userSync.Bridges[:index], userSync.Bridges[index+1:]...)
-				break
+			// remove bridge from syncing clients
+			for index, bridge := range userSync.Bridges {
+				if bridge.Name == ws.Bridge.Name {
+					userSync.Bridges = append(userSync.Bridges[:index], userSync.Bridges[index+1:]...)
+					break
+				}
 			}
 		}
 	}()
