@@ -141,18 +141,6 @@ func (clientDb *ClientDB) Init() error {
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS messages ( 
-	id INTEGER PRIMARY KEY AUTOINCREMENT, 
-	roomID TEXT NOT NULL,
-	message TEXT NOT NULL,
-	sender TEXT NOT NULL,
-	platformName TEXT NOT NULL,
-	messageType TEXT NOT NULL,
-	messageText TEXT NOT NULL,
-	rawMessage TEXT NOT NULL,
-	imageUrl TEXT,
-	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
 	`)
 
 	if err != nil {

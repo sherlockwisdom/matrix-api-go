@@ -396,6 +396,7 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 		go func(bridge *Bridges) {
 			for evt := range bridge.ChMsgEvt {
 				log.Println("Incoming message:", evt.Content.AsMessage().Body)
+				log.Println(evt)
 			}
 			wg.Done()
 		}(bridge)
