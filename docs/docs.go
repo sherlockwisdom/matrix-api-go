@@ -17,6 +17,7 @@ const docTemplate = `{
     "paths": {
         "/": {
             "post": {
+                "description": "Registers a new user and returns an access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -65,6 +66,7 @@ const docTemplate = `{
         },
         "/login": {
             "post": {
+                "description": "Authenticates a user and returns an access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -113,6 +115,7 @@ const docTemplate = `{
         },
         "/{platform}/devices/": {
             "post": {
+                "description": "Registers a new bridge connection for the specified platform",
                 "consumes": [
                     "application/json"
                 ],
@@ -168,6 +171,7 @@ const docTemplate = `{
         },
         "/{platform}/message/{contact}": {
             "post": {
+                "description": "Sends a message to a contact through the specified platform bridge",
                 "consumes": [
                     "application/json"
                 ],
@@ -229,10 +233,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "syt_YWxwaGE..."
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "john_doe"
                 }
             }
         },
@@ -241,10 +247,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "securepassword123"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "john_doe"
                 }
             }
         },
@@ -253,10 +261,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "syt_YWxwaGE..."
                 },
                 "message": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Hello, world!"
                 }
             }
         },
@@ -266,7 +276,7 @@ const docTemplate = `{
             "properties": {
                 "websocket_url": {
                     "type": "string",
-                    "example": ""
+                    "example": "ws://localhost:8080/ws/telegram/john_doe"
                 }
             }
         },
@@ -276,11 +286,11 @@ const docTemplate = `{
             "properties": {
                 "details": {
                     "type": "string",
-                    "example": ""
+                    "example": "Username must be 3-32 characters"
                 },
                 "error": {
                     "type": "string",
-                    "example": ""
+                    "example": "Invalid request"
                 }
             }
         },
@@ -290,15 +300,15 @@ const docTemplate = `{
             "properties": {
                 "access_token": {
                     "type": "string",
-                    "example": ""
+                    "example": "syt_YWxwaGE..."
                 },
                 "status": {
                     "type": "string",
-                    "example": ""
+                    "example": "logged in"
                 },
                 "username": {
                     "type": "string",
-                    "example": ""
+                    "example": "john_doe"
                 }
             }
         },
@@ -308,19 +318,19 @@ const docTemplate = `{
             "properties": {
                 "contact": {
                     "type": "string",
-                    "example": ""
+                    "example": "+1234567890"
                 },
                 "event_id": {
                     "type": "string",
-                    "example": ""
+                    "example": "$1234567890abcdef"
                 },
                 "message": {
                     "type": "string",
-                    "example": ""
+                    "example": "Hello, world!"
                 },
                 "status": {
                     "type": "string",
-                    "example": ""
+                    "example": "sent"
                 }
             }
         }
@@ -331,10 +341,10 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
-	BasePath:         "",
-	Schemes:          []string{},
+	BasePath:         "/",
+	Schemes:          []string{"http", "https"},
 	Title:            "ShortMesh API",
-	Description:      "ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.",
+	Description:      "Response payload for successful device addition",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

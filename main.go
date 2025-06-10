@@ -19,6 +19,13 @@ import (
 	// "maunium.net/go/mautrix/id"
 )
 
+// @title           ShortMesh API
+// @version         1.0
+// @description     ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.
+// @host      localhost:8080
+// @BasePath  /
+// @schemes   http https
+
 // Users represents a user entity
 // @Description Represents a user structure with a name
 // @name Users
@@ -34,8 +41,8 @@ type Users struct {
 // @name ClientJsonRequest
 // @type object
 type ClientJsonRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" example:"john_doe"`
+	Password string `json:"password" example:"securepassword123"`
 }
 
 // ClientMessageJsonRequeset represents a message sending request
@@ -43,8 +50,8 @@ type ClientJsonRequest struct {
 // @name ClientMessageJsonRequeset
 // @type object
 type ClientMessageJsonRequeset struct {
-	AccessToken string `json:"access_token"`
-	Message     string `json:"message"`
+	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
+	Message     string `json:"message" example:"Hello, world!"`
 }
 
 // ClientBridgeJsonRequest represents bridge connection details
@@ -52,38 +59,38 @@ type ClientMessageJsonRequeset struct {
 // @name ClientBridgeJsonRequest
 // @type object
 type ClientBridgeJsonRequest struct {
-	Username    string `json:"username"`
-	AccessToken string `json:"access_token"`
+	Username    string `json:"username" example:"john_doe"`
+	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
 }
 
 // LoginResponse represents the response for successful login
 // @Description Response payload for successful login
 type LoginResponse struct {
-	Username    string `json:"username" example:""`
-	AccessToken string `json:"access_token" example:""`
-	Status      string `json:"status" example:""`
+	Username    string `json:"username" example:"john_doe"`
+	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
+	Status      string `json:"status" example:"logged in"`
 }
 
 // ErrorResponse represents an error response
 // @Description Response payload for error cases
 type ErrorResponse struct {
-	Error   string `json:"error" example:""`
-	Details string `json:"details,omitempty" example:""`
+	Error   string `json:"error" example:"Invalid request"`
+	Details string `json:"details,omitempty" example:"Username must be 3-32 characters"`
 }
 
 // MessageResponse represents the response for successful message sending
 // @Description Response payload for successful message sending
 type MessageResponse struct {
-	Contact string `json:"contact" example:""`
-	EventID string `json:"event_id" example:""`
-	Message string `json:"message" example:""`
-	Status  string `json:"status" example:""`
+	Contact string `json:"contact" example:"+1234567890"`
+	EventID string `json:"event_id" example:"$1234567890abcdef"`
+	Message string `json:"message" example:"Hello, world!"`
+	Status  string `json:"status" example:"sent"`
 }
 
 // DeviceResponse represents the response for successful device addition
 // @Description Response payload for successful device addition
 type DeviceResponse struct {
-	WebsocketURL string `json:"websocket_url" example:""`
+	WebsocketURL string `json:"websocket_url" example:"ws://localhost:8080/ws/telegram/john_doe"`
 }
 
 // Input validation functions
@@ -155,6 +162,7 @@ func sanitizeContact(contact string) (string, error) {
 
 // ApiLogin godoc
 // @Summary Logs a user into the Matrix server
+// @Description Authenticates a user and returns an access token
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "Login Credentials"
@@ -214,6 +222,7 @@ func ApiLogin(c *gin.Context) {
 
 // ApiCreate godoc
 // @Summary Creates a new user on the Matrix server
+// @Description Registers a new user and returns an access token
 // @Accept  json
 // @Produce  json
 // @Param   payload body ClientJsonRequest true "User Registration"
@@ -274,10 +283,11 @@ func ApiCreate(c *gin.Context) {
 
 // ApiSendMessage godoc
 // @Summary Sends a message to a specified room
+// @Description Sends a message to a contact through the specified platform bridge
 // @Accept  json
 // @Produce  json
-// @Param   platform path string true "Platform Name"
-// @Param   contact path string true "Contact ID (E.164 phone number)"
+// @Param   platform path string true "Platform Name" example:"telegram"
+// @Param   contact path string true "Contact ID (E.164 phone number)" example:"+1234567890"
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
 // @Success 200 {object} MessageResponse "Message sent successfully"
 // @Failure 400 {object} ErrorResponse "Invalid request"
@@ -346,9 +356,10 @@ func ApiSendMessage(c *gin.Context) {
 
 // ApiAddDevice godoc
 // @Summary Adds a device/bridge for a given platform
+// @Description Registers a new bridge connection for the specified platform
 // @Accept  json
 // @Produce  json
-// @Param   platform path string true "Platform Name"
+// @Param   platform path string true "Platform Name" example:"telegram"
 // @Param   payload body ClientBridgeJsonRequest true "Bridge Payload"
 // @Success 200 {object} DeviceResponse "Successfully added device"
 // @Failure 400 {object} ErrorResponse "Invalid request"
@@ -426,10 +437,6 @@ func ApiAddDevice(c *gin.Context) {
 	})
 }
 
-// @title           ShortMesh API
-// @version         1.0
-// @description     ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.
-// @host      localhost:8080
 func main() {
 	if cfgError != nil {
 		panic(cfgError)

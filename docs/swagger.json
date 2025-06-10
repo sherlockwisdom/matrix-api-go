@@ -1,15 +1,21 @@
 {
+    "schemes": [
+        "http",
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
-        "description": "ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.",
+        "description": "Response payload for successful device addition",
         "title": "ShortMesh API",
         "contact": {},
         "version": "1.0"
     },
     "host": "localhost:8080",
+    "basePath": "/",
     "paths": {
         "/": {
             "post": {
+                "description": "Registers a new user and returns an access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -58,6 +64,7 @@
         },
         "/login": {
             "post": {
+                "description": "Authenticates a user and returns an access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -106,6 +113,7 @@
         },
         "/{platform}/devices/": {
             "post": {
+                "description": "Registers a new bridge connection for the specified platform",
                 "consumes": [
                     "application/json"
                 ],
@@ -161,6 +169,7 @@
         },
         "/{platform}/message/{contact}": {
             "post": {
+                "description": "Sends a message to a contact through the specified platform bridge",
                 "consumes": [
                     "application/json"
                 ],
@@ -222,10 +231,12 @@
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "syt_YWxwaGE..."
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "john_doe"
                 }
             }
         },
@@ -234,10 +245,12 @@
             "type": "object",
             "properties": {
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "securepassword123"
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "john_doe"
                 }
             }
         },
@@ -246,10 +259,12 @@
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "syt_YWxwaGE..."
                 },
                 "message": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Hello, world!"
                 }
             }
         },
@@ -259,7 +274,7 @@
             "properties": {
                 "websocket_url": {
                     "type": "string",
-                    "example": ""
+                    "example": "ws://localhost:8080/ws/telegram/john_doe"
                 }
             }
         },
@@ -269,11 +284,11 @@
             "properties": {
                 "details": {
                     "type": "string",
-                    "example": ""
+                    "example": "Username must be 3-32 characters"
                 },
                 "error": {
                     "type": "string",
-                    "example": ""
+                    "example": "Invalid request"
                 }
             }
         },
@@ -283,15 +298,15 @@
             "properties": {
                 "access_token": {
                     "type": "string",
-                    "example": ""
+                    "example": "syt_YWxwaGE..."
                 },
                 "status": {
                     "type": "string",
-                    "example": ""
+                    "example": "logged in"
                 },
                 "username": {
                     "type": "string",
-                    "example": ""
+                    "example": "john_doe"
                 }
             }
         },
@@ -301,19 +316,19 @@
             "properties": {
                 "contact": {
                     "type": "string",
-                    "example": ""
+                    "example": "+1234567890"
                 },
                 "event_id": {
                     "type": "string",
-                    "example": ""
+                    "example": "$1234567890abcdef"
                 },
                 "message": {
                     "type": "string",
-                    "example": ""
+                    "example": "Hello, world!"
                 },
                 "status": {
                     "type": "string",
-                    "example": ""
+                    "example": "sent"
                 }
             }
         }
