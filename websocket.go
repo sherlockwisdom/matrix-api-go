@@ -85,6 +85,10 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 						ws.Bridge.RoomID,
 						bridgeCfg.Cmd["cancel"],
 					)
+
+					if err != nil {
+						log.Printf("Error sending cancel command to %s: %v", ws.Bridge.RoomID, err)
+					}
 				}
 				break
 			}

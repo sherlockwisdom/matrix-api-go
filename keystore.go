@@ -138,7 +138,8 @@ func (clientDb *ClientDB) Init() error {
 	name TEXT NOT NULL,
 	members TEXT NOT NULL,
 	isBridge INTEGER NOT NULL,
-	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(clientUsername, roomID, name, isBridge)
 	);
 
 	`)
@@ -257,7 +258,7 @@ func (clientDb *ClientDB) StoreRooms(
 	}
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO rooms (clientUsername, roomID, name, members, isBridge) values(?,?,?,?,?)`,
+		`INSERT OR REPLACE INTO rooms (clientUsername, roomID, name, members, isBridge) values(?,?,?,?,?)`,
 	)
 	if err != nil {
 		return err
@@ -267,12 +268,13 @@ func (clientDb *ClientDB) StoreRooms(
 
 	_, err = stmt.Exec(clientDb.username, roomID, platformName, members, isBridge)
 	if err != nil {
-		return err
+		tx.Rollback()
+		return fmt.Errorf("failed to store room: %w", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -391,38 +393,4 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 	}
 
 	return bridges, err
-}
-
-func (clientDb *ClientDB) StoreMessages(
-	roomID string,
-	message string,
-	messageType string,
-	messageText string,
-	rawMessage string,
-	imageUrl string,
-) error {
-	log.Println("[+] Storing message to:", roomID, message, messageType, messageText, rawMessage, imageUrl)
-	tx, err := clientDb.connection.Begin()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := tx.Prepare(`INSERT INTO messages (roomID, message, messageType, messageText, rawMessage, imageUrl) values(?,?,?,?,?,?)`)
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
-	_, err = stmt.Exec(roomID, message, messageType, messageText, rawMessage, imageUrl)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

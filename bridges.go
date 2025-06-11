@@ -190,7 +190,6 @@ func (b *Bridges) JoinRooms() error {
 
 func (b *Bridges) IsManagementRoom() (bool, error) {
 	members, err := b.Client.JoinedMembers(context.Background(), b.RoomID)
-	log.Println("Members:", members)
 	if err != nil {
 		return false, err
 	}

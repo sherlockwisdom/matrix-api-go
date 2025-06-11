@@ -27,6 +27,12 @@ type MatrixClient struct {
 	Client *mautrix.Client
 }
 
+type IncomingMessage struct {
+	RoomID  id.RoomID
+	Sender  id.UserID
+	Content event.Content
+}
+
 /*
 This function adds the user to the database and joins the bridge rooms
 */
@@ -217,25 +223,22 @@ func (b *Bridges) GetInvites(
 				return err
 			}
 
-			room := Rooms{
-				Client: b.Client,
-				ID:     evt.RoomID,
-			}
-			if isBridge, err := room.IsBridgeInviteForContact(evt); isBridge {
-				log.Println("Bridge message handled -", evt.RoomID)
-				log.Println(err)
+			// room := Rooms{
+			// 	Client: b.Client,
+			// 	ID:     evt.RoomID,
+			// }
+			// if isBridge, _ := room.IsBridgeInviteForContact(evt); isBridge {
+			// 	var clientDB ClientDB = ClientDB{
+			// 		username: b.Client.UserID.Localpart(),
+			// 		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+			// 	}
 
-				var clientDB ClientDB = ClientDB{
-					username: b.Client.UserID.Localpart(),
-					filepath: "db/" + b.Client.UserID.Localpart() + ".db",
-				}
+			// 	roomName := *evt.StateKey
+			// 	log.Println("roomName:", roomName)
 
-				roomName := *evt.StateKey
-				log.Println("roomName:", roomName)
-
-				clientDB.Init()
-				clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, false)
-			}
+			// 	clientDB.Init()
+			// 	clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, false)
+			// }
 		}
 	}
 	return nil
@@ -273,6 +276,7 @@ func (m *MatrixClient) Sync() error {
 func (m *MatrixClient) SyncAllClients() error {
 	log.Println("Syncing all clients")
 	var wg sync.WaitGroup
+
 	for {
 		users, err := ks.FetchAllUsers()
 
@@ -316,6 +320,7 @@ func (m *MatrixClient) SyncAllClients() error {
 			userSync.Syncing = false
 
 		}
+
 		time.Sleep(3 * time.Second)
 	}
 }
@@ -394,9 +399,47 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 	for _, bridge := range bridges {
 		wg.Add(1)
 		go func(bridge *Bridges) {
+			bridge.Client = m.Client
 			for evt := range bridge.ChMsgEvt {
-				log.Println("Incoming message:", evt.Content.AsMessage().Body)
-				log.Println(evt)
+				isManagementRoom, err := bridge.IsManagementRoom()
+				if err != nil {
+					log.Println("Error checking if bridge is management room:", err)
+				}
+
+				isBridgeBot := evt.Sender.String() == bridge.BotName
+				isClientUser := evt.Sender.String() == m.Client.UserID.String()
+
+				if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
+					incomingMessage := IncomingMessage{
+						RoomID: evt.RoomID,
+						Sender: evt.Sender,
+					}
+					clientDb := ClientDB{
+						username: bridge.Client.UserID.Localpart(),
+						filepath: "db/" + bridge.Client.UserID.Localpart() + ".db",
+					}
+					userSync := syncingClients.Users[bridge.Client.UserID.Localpart()]
+					if userSync == nil {
+						userSync = &UserSync{
+							Name:    bridge.Client.UserID.Localpart(),
+							Bridges: make([]*Bridges, 0),
+						}
+					}
+					userSync.SyncMutex.Lock()
+					clientDb.Init()
+
+					err := clientDb.StoreRooms(
+						incomingMessage.RoomID.String(),
+						bridge.Name,
+						incomingMessage.Sender.String(),
+						false,
+					)
+					if err != nil {
+						log.Println("Error storing room:", err)
+					}
+					userSync.SyncMutex.Unlock()
+					// log.Println("Incoming message:", incomingMessage)
+				}
 			}
 			wg.Done()
 		}(bridge)
