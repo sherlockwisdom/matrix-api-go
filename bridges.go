@@ -67,7 +67,8 @@ func (b *Bridges) AddDevice() error {
 			go func() {
 				since := time.Now().UnixMilli()
 				log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChLoginSyncEvt)
-				for evt := range b.ChLoginSyncEvt {
+				for {
+					evt := <-b.ChLoginSyncEvt
 					if evt.RoomID == b.RoomID &&
 						evt.Sender != b.Client.UserID &&
 						evt.Timestamp >= since &&

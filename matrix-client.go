@@ -211,13 +211,19 @@ func (m *MatrixClient) Create(username string, password string) (string, error) 
 	return resp.AccessToken, nil
 }
 
+// func (b *Bridges) HandleLoginEvt(
+// 	evt *event.Event,
+// ) {
+// 	if evt.Content.Raw["msgtype"] == "m.notice" && evt.RoomID == b.RoomID && evt.Sender != b.Client.UserID {
+// 		b.ChLoginSyncEvt <- evt
+// 	}
+// }
+
 func (b *Bridges) GetInvites(
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
-		log.Println("[+] Getting invites for: ", b.RoomID)
 		if evt.StateKey != nil && *evt.StateKey == b.Client.UserID.String() {
-			log.Printf("[+] >> New invite to room: %s from %s\n", evt.RoomID, evt.Sender)
 			_, err := b.Client.JoinRoomByID(context.Background(), evt.RoomID)
 			if err != nil {
 				return err
@@ -250,21 +256,31 @@ func (m *MatrixClient) Sync() error {
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
 		bridges := syncingClients.Users[m.Client.UserID.Localpart()].Bridges
+
+		wg := sync.WaitGroup{}
 		for _, bridge := range bridges {
 			bridge.Client = m.Client
 
+			wg.Add(2)
 			go func() {
 				bridge.ChMsgEvt <- evt
+				wg.Done()
+				log.Print("Done syncing msg evt")
 			}()
 
-			go func() {
-				bridge.ChLoginSyncEvt <- evt
-			}()
+			// go func() {
+			// 	bridge.HandleLoginEvt(evt)
+			// 	wg.Done()
+			// 	log.Print("Done syncing login evt")
+			// }()
 
 			go func() {
 				bridge.GetInvites(evt)
+				wg.Done()
+				log.Print("Done syncing invites")
 			}()
 		}
+		wg.Wait()
 	})
 
 	if err := m.Client.Sync(); err != nil {
@@ -355,7 +371,6 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 		bridge.Client = client
 	}
 
-	log.Println("Bridges:", bridges)
 	if len(bridges) == 0 {
 		log.Println("No bridges found for user:", user.Username)
 		return nil
@@ -373,6 +388,7 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 			bridges...,
 		)
 	}
+	log.Println("Syncing clients:", syncingClients)
 
 	go func() {
 		err = mc.syncIncomingMessages(userSync)
@@ -395,21 +411,26 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 	log.Println("Syncing incoming messages for user:", userSync.Name)
 	bridges := userSync.Bridges
+
 	wg := sync.WaitGroup{}
+	wg.Add(len(bridges))
 	for _, bridge := range bridges {
-		wg.Add(1)
 		go func(bridge *Bridges) {
-			bridge.Client = m.Client
-			for evt := range bridge.ChMsgEvt {
+			log.Println("Syncing incoming messages for bridge:", bridge.Name)
+			for {
+				evt := <-bridge.ChMsgEvt
+				log.Println("Received event:", evt)
 				isManagementRoom, err := bridge.IsManagementRoom()
 				if err != nil {
 					log.Println("Error checking if bridge is management room:", err)
 				}
 
 				isBridgeBot := evt.Sender.String() == bridge.BotName
-				isClientUser := evt.Sender.String() == m.Client.UserID.String()
+				// isClientUser := evt.Sender.String() == m.Client.UserID.String()
 
-				if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
+				// if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
+				if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot {
+					log.Println("Incoming message:", evt.Content.AsMessage().Body)
 					incomingMessage := IncomingMessage{
 						RoomID: evt.RoomID,
 						Sender: evt.Sender,
@@ -438,10 +459,8 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 						log.Println("Error storing room:", err)
 					}
 					userSync.SyncMutex.Unlock()
-					// log.Println("Incoming message:", incomingMessage)
 				}
 			}
-			wg.Done()
 		}(bridge)
 	}
 	wg.Wait()
