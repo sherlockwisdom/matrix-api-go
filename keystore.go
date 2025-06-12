@@ -315,40 +315,51 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 	return room, err
 }
 
-func (clientDb *ClientDB) FetchRoomsByMembers(name string) (Rooms, error) {
-	log.Println("Fetching room members for", name, clientDb.filepath)
+func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
+	log.Println("Fetching room members for", members, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, type, isBridge from rooms where name = ?",
+		"select clientUsername, roomID, name, members, type, isBridge from rooms where members = ?",
 	)
 	if err != nil {
-		return Rooms{}, err
+		return nil, err
 	}
-	var clientUsername string
-	var _roomID string
-	var _name string
-	var members string
-	var _type int
-	var isBridge bool
-
 	defer stmt.Close()
 
-	err = stmt.QueryRow(name).Scan(&clientUsername, &_roomID, &_name, &members, &_type, &isBridge)
+	rows, err := stmt.Query(members)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return Rooms{}, nil
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rooms []Rooms
+	for rows.Next() {
+		var clientUsername string
+		var _roomID string
+		var _name string
+		var _members string
+		var _type int
+		var isBridge bool
+
+		err = rows.Scan(&clientUsername, &_roomID, &_name, &_members, &_type, &isBridge)
+		if err != nil {
+			return nil, err
 		}
-		return Rooms{}, err
+
+		room := Rooms{
+			ID:       id.RoomID(_roomID),
+			isBridge: isBridge,
+			Members: map[string]string{
+				_name: _members,
+			},
+		}
+		rooms = append(rooms, room)
 	}
 
-	var room = Rooms{
-		ID:       id.RoomID(_roomID),
-		isBridge: isBridge,
-		Members: map[string]string{
-			_name: members,
-		},
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
-	return room, err
+	return rooms, nil
 }
 
 func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) {

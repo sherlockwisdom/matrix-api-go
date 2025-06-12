@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"sync"
 
@@ -87,5 +88,42 @@ func (c *Controller) LoginProcess(password string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *Controller) SendMessage(username, message, contact, platform string) error {
+	formattedUsername, err := cfg.FormatUsername(platform, contact)
+	if err != nil {
+		return err
+	}
+
+	user, err := ks.FetchUser(username)
+	if err != nil {
+		return err
+	}
+
+	clientDb := ClientDB{
+		username: user.Username,
+		filepath: "db/" + user.Username + ".db",
+	}
+
+	clientDb.Init()
+
+	rooms, err := clientDb.FetchRoomsByMembers(formattedUsername)
+	if err != nil {
+		return err
+	}
+
+	for _, room := range rooms {
+		resp, err := c.Client.SendText(
+			context.Background(),
+			room.ID,
+			message,
+		)
+		if err != nil {
+			return err
+		}
+		log.Println("Sent message to", room.ID, resp.EventID)
+	}
 	return nil
 }

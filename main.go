@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +20,12 @@ import (
 
 // @title           ShortMesh API
 // @version         1.0
-// @description     ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms. It provides endpoints for user management, message sending, and platform bridging capabilities. The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.
+// @description     ShortMesh is a Matrix-based messaging bridge API that enables seamless communication across different messaging platforms.
+// @description     It provides endpoints for user management, message sending, and platform bridging capabilities.
+// @description     The API supports E.164 phone number format for contacts and implements secure authentication mechanisms.
+// @description     The API supports the following platforms:
+// @description     - WhatsApp
+// @description     - Signal (coming soon)
 // @host      localhost:8080
 // @BasePath  /
 // @schemes   http https
@@ -50,6 +54,7 @@ type ClientJsonRequest struct {
 // @name ClientMessageJsonRequeset
 // @type object
 type ClientMessageJsonRequeset struct {
+	Username    string `json:"username" example:"john_doe"`
 	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
 	Message     string `json:"message" example:"Hello, world!"`
 }
@@ -287,7 +292,7 @@ func ApiCreate(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   platform path string true "Platform Name" example:"telegram"
-// @Param   contact path string true "Contact ID (E.164 phone number)" example:"+1234567890"
+// @Param   contact path string true "Contact ID (E.164 phone number without the plus)" example:"1234567890"
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
 // @Success 200 {object} MessageResponse "Message sent successfully"
 // @Failure 400 {object} ErrorResponse "Invalid request"
@@ -332,14 +337,12 @@ func ApiSendMessage(c *gin.Context) {
 		return
 	}
 
-	room := Rooms{}
+	controller := Controller{
+		Client: client,
+		UserID: client.UserID,
+	}
 
-	resp, err := client.SendText(
-		context.Background(),
-		room.ID,
-		message,
-	)
-
+	err = controller.SendMessage(req.Username, message, contactID, c.Param("platform"))
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
@@ -347,10 +350,9 @@ func ApiSendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"contact":  contactID,
-		"event_id": resp.EventID,
-		"message":  message,
-		"status":   "sent",
+		"contact": contactID,
+		"message": message,
+		"status":  "sent",
 	})
 }
 

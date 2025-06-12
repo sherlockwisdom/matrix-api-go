@@ -132,3 +132,28 @@ func (c *Conf) CheckUsernameTemplate(bridgeType string, username string) (bool, 
 
 	return matched, nil
 }
+
+func (c *Conf) FormatUsername(bridgeType string, username string) (string, error) {
+	config, ok := c.GetBridgeConfig(bridgeType)
+	if !ok {
+		return "", fmt.Errorf("bridge type %s not found in configuration", bridgeType)
+	}
+
+	if config.UsernameTemplate == "" {
+		return "", fmt.Errorf("username template not found for bridge type %s", bridgeType)
+	}
+
+	// Replace {{.}} with the actual username
+	formattedUsername := strings.ReplaceAll(config.UsernameTemplate, "{{.}}", username)
+
+	// Ensure the username is properly formatted as a Matrix user ID
+	// Matrix user IDs should be in the format @localpart:domain
+	if !strings.HasPrefix(formattedUsername, "@") {
+		formattedUsername = "@" + formattedUsername
+	}
+	if !strings.Contains(formattedUsername, ":") {
+		formattedUsername = formattedUsername + ":" + c.HomeServerDomain
+	}
+
+	return formattedUsername, nil
+}
