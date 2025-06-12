@@ -355,17 +355,20 @@ func ApiSendMessage(c *gin.Context) {
 }
 
 // ApiAddDevice godoc
-// @Summary Adds a device/bridge for a given platform
-// @Description Registers a new bridge connection for the specified platform
+// @Summary Adds a device for a given platform
+// @Description Registers a new device connection for the specified platform.
+// @Description Here are various platforms supported:
+// @Description 'wa' (for WhatsApp)
+// @Description 'signal' (for Signal)
 // @Accept  json
 // @Produce  json
-// @Param   platform path string true "Platform Name" example:"telegram"
-// @Param   payload body ClientBridgeJsonRequest true "Bridge Payload"
+// @Param   platform path string true "Platform Name" example:"wa"
+// @Param   payload body ClientBridgeJsonRequest true "Device Payload"
 // @Success 200 {object} DeviceResponse "Successfully added device"
 // @Failure 400 {object} ErrorResponse "Invalid request"
-// @Failure 404 {object} ErrorResponse "Bridge not found"
+// @Failure 401 {object} ErrorResponse "Invalid access token"
 // @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /{platform}/devices/ [post]
+// @Router /{platform}/devices [post]
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
 
@@ -462,7 +465,7 @@ func main() {
 	router.POST("/", ApiCreate)
 	router.POST("/login", ApiLogin)
 	router.POST("/:platform/message/:contact", ApiSendMessage)
-	router.POST("/:platform/devices/", ApiAddDevice)
+	router.POST("/:platform/devices", ApiAddDevice)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	ks.Init()

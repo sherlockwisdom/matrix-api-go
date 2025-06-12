@@ -113,16 +113,16 @@ const docTemplate = `{
                 }
             }
         },
-        "/{platform}/devices/": {
+        "/{platform}/devices": {
             "post": {
-                "description": "Registers a new bridge connection for the specified platform",
+                "description": "Registers a new device connection for the specified platform.\nHere are various platforms supported:\n'wa' (for WhatsApp)\n'signal' (for Signal)",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Adds a device/bridge for a given platform",
+                "summary": "Adds a device for a given platform",
                 "parameters": [
                     {
                         "type": "string",
@@ -132,7 +132,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Bridge Payload",
+                        "description": "Device Payload",
                         "name": "payload",
                         "in": "body",
                         "required": true,
@@ -154,8 +154,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
                     },
-                    "404": {
-                        "description": "Bridge not found",
+                    "401": {
+                        "description": "Invalid access token",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
