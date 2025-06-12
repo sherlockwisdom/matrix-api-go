@@ -76,3 +76,20 @@ func (r *Rooms) GetRoomMembers(client *mautrix.Client, roomId id.RoomID) ([]id.U
 
 	return membersList, nil
 }
+
+func (r *Rooms) IsManagementRoom(botName string) (bool, error) {
+	members, err := r.Client.JoinedMembers(context.Background(), r.ID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(members.Joined) == 2 {
+		for userID, _ := range members.Joined {
+			if userID.String() == botName {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}

@@ -14,6 +14,7 @@ server:
 bridges:
   - signal:
       botname: "@signalbot:relaysms.me"
+      username_template: "signal_{{.}}"
       cmd:
         login: "!signal login"
         failed: "Login failed: too many QR code refreshes"
@@ -22,6 +23,7 @@ bridges:
 
   - wa:
       botname: "@whatsappbot:relaysms.me"
+      username_template: "whatsapp_{{.}}"
       cmd:
         login: "!wa login qr"
         failed: "Login failed: Entering code or scanning QR timed out. Please try again."

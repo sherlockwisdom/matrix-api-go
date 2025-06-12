@@ -131,7 +131,11 @@ func (b *Bridges) JoinRooms() error {
 	var managementRoom = false
 	if b.RoomID != "" {
 		log.Println("Checking management room:", b.RoomID)
-		mngRoom, err := b.IsManagementRoom()
+		room := Rooms{
+			Client: b.Client,
+			ID:     b.RoomID,
+		}
+		mngRoom, err := room.IsManagementRoom(b.BotName)
 		if err != nil {
 			return err
 		}
@@ -144,17 +148,16 @@ func (b *Bridges) JoinRooms() error {
 		}
 		log.Println("Joined rooms:", rooms)
 		for _, room := range rooms.JoinedRooms {
-			tB := &Bridges{
-				Client:  b.Client,
-				RoomID:  room,
-				BotName: b.BotName,
+			room := Rooms{
+				Client: b.Client,
+				ID:     room,
 			}
-			mngRoom, err := tB.IsManagementRoom()
+			mngRoom, err := room.IsManagementRoom(b.BotName)
 			if err != nil {
 				return err
 			}
 			if mngRoom {
-				b.RoomID = room
+				b.RoomID = room.ID
 				managementRoom = true
 				break
 			}
@@ -187,21 +190,4 @@ func (b *Bridges) JoinRooms() error {
 	log.Println("[+] Stored room successfully for:", b.BotName, b.RoomID)
 
 	return nil
-}
-
-func (b *Bridges) IsManagementRoom() (bool, error) {
-	members, err := b.Client.JoinedMembers(context.Background(), b.RoomID)
-	if err != nil {
-		return false, err
-	}
-
-	if len(members.Joined) == 2 {
-		for userID, _ := range members.Joined {
-			if userID.String() == b.BotName {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
 }

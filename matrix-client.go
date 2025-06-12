@@ -262,11 +262,10 @@ func (m *MatrixClient) Sync() error {
 			bridge.Client = m.Client
 
 			wg.Add(2)
-			go func() {
+			go func(bridge *Bridges) {
 				bridge.ChMsgEvt <- evt
 				wg.Done()
-				log.Print("Done syncing msg evt")
-			}()
+			}(bridge)
 
 			// go func() {
 			// 	bridge.HandleLoginEvt(evt)
@@ -274,11 +273,10 @@ func (m *MatrixClient) Sync() error {
 			// 	log.Print("Done syncing login evt")
 			// }()
 
-			go func() {
+			go func(bridge *Bridges) {
 				bridge.GetInvites(evt)
 				wg.Done()
-				log.Print("Done syncing invites")
-			}()
+			}(bridge)
 		}
 		wg.Wait()
 	})
@@ -415,51 +413,75 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 	wg := sync.WaitGroup{}
 	wg.Add(len(bridges))
 	for _, bridge := range bridges {
-		go func(bridge *Bridges) {
-			log.Println("Syncing incoming messages for bridge:", bridge.Name)
+		go func(bridge1 *Bridges) {
 			for {
-				evt := <-bridge.ChMsgEvt
-				log.Println("Received event:", evt)
-				isManagementRoom, err := bridge.IsManagementRoom()
+				evt := <-bridge1.ChMsgEvt
+				if evt.RoomID == "" {
+					continue
+				}
+
+				matchBridge, err := cfg.CheckUsernameTemplate(bridge1.Name, evt.Sender.String())
 				if err != nil {
-					log.Println("Error checking if bridge is management room:", err)
+					log.Println("Error checking if bridge is bot:", err)
 				}
 
-				isBridgeBot := evt.Sender.String() == bridge.BotName
-				// isClientUser := evt.Sender.String() == m.Client.UserID.String()
+				if !matchBridge {
+					continue
+				}
 
-				// if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
-				if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot {
-					log.Println("Incoming message:", evt.Content.AsMessage().Body)
-					incomingMessage := IncomingMessage{
-						RoomID: evt.RoomID,
-						Sender: evt.Sender,
+				go func(bridge2 *Bridges) {
+					log.Println("Received event:", evt.Sender.String(), evt.RoomID.String(), bridge2.BotName)
+					room := Rooms{
+						Client: bridge2.Client,
+						ID:     evt.RoomID,
 					}
-					clientDb := ClientDB{
-						username: bridge.Client.UserID.Localpart(),
-						filepath: "db/" + bridge.Client.UserID.Localpart() + ".db",
-					}
-					userSync := syncingClients.Users[bridge.Client.UserID.Localpart()]
-					if userSync == nil {
-						userSync = &UserSync{
-							Name:    bridge.Client.UserID.Localpart(),
-							Bridges: make([]*Bridges, 0),
-						}
-					}
-					userSync.SyncMutex.Lock()
-					clientDb.Init()
-
-					err := clientDb.StoreRooms(
-						incomingMessage.RoomID.String(),
-						bridge.Name,
-						incomingMessage.Sender.String(),
-						false,
-					)
+					isManagementRoom, err := room.IsManagementRoom(bridge2.BotName)
 					if err != nil {
-						log.Println("Error storing room:", err)
+						log.Println("Error checking if bridge is management room:", err)
 					}
-					userSync.SyncMutex.Unlock()
-				}
+
+					isBridgeBot := func() bool {
+						for _, bridge := range bridges {
+							if bridge.BotName == evt.Sender.String() {
+								return true
+							}
+						}
+						return false
+					}()
+					isClientUser := evt.Sender.String() == m.Client.UserID.String()
+
+					if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
+						log.Println("Incoming message:", evt.Content.AsMessage().Body, bridge2.Name, bridge2.BotName)
+						incomingMessage := IncomingMessage{
+							RoomID: evt.RoomID,
+							Sender: evt.Sender,
+						}
+						clientDb := ClientDB{
+							username: bridge2.Client.UserID.Localpart(),
+							filepath: "db/" + bridge2.Client.UserID.Localpart() + ".db",
+						}
+						userSync := syncingClients.Users[bridge2.Client.UserID.Localpart()]
+						if userSync == nil {
+							userSync = &UserSync{
+								Name:    bridge2.Client.UserID.Localpart(),
+								Bridges: make([]*Bridges, 0),
+							}
+						}
+						userSync.SyncMutex.Lock()
+						clientDb.Init()
+
+						err := clientDb.StoreRooms(
+							incomingMessage.RoomID.String(),
+							bridge2.Name,
+							incomingMessage.Sender.String(),
+							false,
+						)
+						if err != nil {
+							log.Println("Error storing room:", err)
+						}
+						userSync.SyncMutex.Unlock()
+					}
+				}(bridge1)
 			}
 		}(bridge)
 	}

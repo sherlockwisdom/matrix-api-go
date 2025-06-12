@@ -13,8 +13,9 @@ import (
 )
 
 type BridgeConfig struct {
-	BotName string            `yaml:"botname"`
-	Cmd     map[string]string `yaml:"cmd"` // ← map instead of slice of maps
+	BotName          string            `yaml:"botname"`
+	UsernameTemplate string            `yaml:"username_template"`
+	Cmd              map[string]string `yaml:"cmd"` // ← map instead of slice of maps
 }
 
 type Tls struct {
@@ -101,6 +102,32 @@ func (c *Conf) CheckSuccessPattern(bridgeType string, input string) (bool, error
 	matched, err := regexp.MatchString(regexPattern, input)
 	if err != nil {
 		return false, fmt.Errorf("error matching pattern: %v", err)
+	}
+
+	return matched, nil
+}
+
+func (c *Conf) CheckUsernameTemplate(bridgeType string, username string) (bool, error) {
+	config, ok := c.GetBridgeConfig(bridgeType)
+	if !ok {
+		return false, fmt.Errorf("bridge type %s not found in configuration", bridgeType)
+	}
+
+	if config.UsernameTemplate == "" {
+		return false, fmt.Errorf("username template not found for bridge type %s", bridgeType)
+	}
+
+	// Convert template pattern to regex pattern
+	// Replace {{.}} with .* to match any characters
+	regexPattern := strings.ReplaceAll(config.UsernameTemplate, "{{.}}", ".*")
+	// Escape any other special regex characters
+	regexPattern = regexp.QuoteMeta(regexPattern)
+	// Restore the .* pattern
+	regexPattern = strings.ReplaceAll(regexPattern, "\\.\\*", ".*")
+
+	matched, err := regexp.MatchString(regexPattern, username)
+	if err != nil {
+		return false, fmt.Errorf("error matching username pattern: %v", err)
 	}
 
 	return matched, nil
