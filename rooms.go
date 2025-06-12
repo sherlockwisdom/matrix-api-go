@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -83,13 +84,54 @@ func (r *Rooms) IsManagementRoom(botName string) (bool, error) {
 		return false, err
 	}
 
-	if len(members.Joined) == 2 {
-		for userID, _ := range members.Joined {
-			if userID.String() == botName {
-				return true, nil
+	err = r.GetRoomInfo()
+	if err != nil {
+		// return false, err
+		log.Println("Error getting room info:", err)
+	}
+
+	isSpace, err := r.IsSpaceRoom()
+	if err != nil {
+		return false, err
+	}
+
+	if !isSpace {
+		if len(members.Joined) == 2 {
+			botID := id.UserID(botName)
+			if _, ok := members.Joined[botID]; ok {
+				if _, ok := members.Joined[r.Client.UserID]; ok {
+					return true, nil
+				}
 			}
 		}
 	}
 
+	return false, nil
+}
+
+func (r *Rooms) GetRoomInfo() error {
+	// Get room name
+	var nameContent event.RoomNameEventContent
+	err := r.Client.StateEvent(context.Background(), r.ID, event.StateRoomName, "", &nameContent)
+	if err == nil {
+		println("Room name:", nameContent.Name, r.ID)
+	}
+
+	return err
+}
+
+// IsSpaceRoom checks if the given room is a space
+func (r *Rooms) IsSpaceRoom() (bool, error) {
+	var createContent event.CreateEventContent
+
+	err := r.Client.StateEvent(context.Background(), r.ID, event.StateCreate, "", &createContent)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if "type" field is set to "m.space"
+	if createContent.Type == "m.space" {
+		return true, nil
+	}
 	return false, nil
 }

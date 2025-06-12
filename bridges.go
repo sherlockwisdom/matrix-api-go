@@ -128,56 +128,11 @@ func (b *Bridges) AddDevice() error {
 }
 
 func (b *Bridges) JoinRooms() error {
-	var managementRoom = false
-	if b.RoomID != "" {
-		log.Println("Checking management room:", b.RoomID)
-		room := Rooms{
-			Client: b.Client,
-			ID:     b.RoomID,
-		}
-		mngRoom, err := room.IsManagementRoom(b.BotName)
-		if err != nil {
-			return err
-		}
-		managementRoom = mngRoom
-		log.Println("Management room:", managementRoom)
-	} else {
-		rooms, err := b.Client.JoinedRooms(context.Background())
-		if err != nil {
-			return err
-		}
-		log.Println("Joined rooms:", rooms)
-		for _, room := range rooms.JoinedRooms {
-			room := Rooms{
-				Client: b.Client,
-				ID:     room,
-			}
-			mngRoom, err := room.IsManagementRoom(b.BotName)
-			if err != nil {
-				return err
-			}
-			if mngRoom {
-				b.RoomID = room.ID
-				managementRoom = true
-				break
-			}
-		}
-	}
+	joinedRooms, err := b.Client.JoinedRooms(context.Background())
+	log.Println("Joined rooms:", joinedRooms)
 
-	if !managementRoom {
-		resp, err := b.Client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
-			Invite:   []id.UserID{id.UserID(b.BotName)},
-			IsDirect: true,
-			// Preset:     "private_chat",
-			Preset:     "trusted_private_chat",
-			Visibility: "private",
-		})
-
-		if err != nil {
-			return err
-		}
-		log.Println("[+] Created room successfully for:", b.BotName, resp.RoomID)
-		b.RoomID = resp.RoomID
+	if err != nil {
+		return err
 	}
 
 	var clientDb = ClientDB{
@@ -185,6 +140,40 @@ func (b *Bridges) JoinRooms() error {
 		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
 	}
 	clientDb.Init()
+
+	for _, room := range joinedRooms.JoinedRooms {
+		room := Rooms{
+			Client: b.Client,
+			ID:     room,
+		}
+
+		isManagementRoom, err := room.IsManagementRoom(b.BotName)
+		if err != nil {
+			return err
+		}
+		log.Println("Is management room:", room.ID, isManagementRoom)
+
+		if isManagementRoom {
+			b.RoomID = room.ID
+			break
+		}
+	}
+
+	if b.RoomID == "" {
+		log.Println("[+] Creating management room for:", b.BotName)
+		resp, err := b.Client.CreateRoom(context.Background(), &mautrix.ReqCreateRoom{
+			Invite:   []id.UserID{id.UserID(b.BotName)},
+			IsDirect: true,
+			// Preset:     "private_chat",
+			Preset:     "trusted_private_chat",
+			Visibility: "private",
+		})
+		if err != nil {
+			return err
+		}
+
+		b.RoomID = resp.RoomID
+	}
 
 	clientDb.StoreRooms(b.RoomID.String(), b.Name, b.BotName, true)
 	log.Println("[+] Stored room successfully for:", b.BotName, b.RoomID)

@@ -54,8 +54,8 @@ func (c *Controller) CreateProcess(password string) error {
 		return err
 	}
 
-	c.Client.UserID = id.NewUserID(c.Username, cfg.HomeServerDomain)
-	c.Client.AccessToken = accessToken
+	m.Client.UserID = id.NewUserID(c.Username, cfg.HomeServerDomain)
+	m.Client.AccessToken = accessToken
 	log.Println("[+] Created user: ", c.Username)
 
 	err = m.ProcessActiveSessions(password)
@@ -80,7 +80,8 @@ func (c *Controller) LoginProcess(password string) error {
 		}
 	}
 
-	c.Client.AccessToken = accessToken
+	m.Client.UserID = id.NewUserID(c.Username, cfg.HomeServerDomain)
+	m.Client.AccessToken = accessToken
 	err = m.ProcessActiveSessions(password)
 	if err != nil {
 		return err

@@ -70,11 +70,6 @@ func (m *MatrixClient) ProcessActiveSessions(
 		}
 	}
 
-	bridges, err := clientDB.FetchBridgeRooms(m.Client.UserID.Localpart())
-	if err != nil {
-		return err
-	}
-
 	for _, entry := range cfg.Bridges {
 		for name, config := range entry {
 			bridge := Bridges{
@@ -82,13 +77,8 @@ func (m *MatrixClient) ProcessActiveSessions(
 				Client:  m.Client,
 				BotName: config.BotName,
 			}
-			for _, _bridge := range bridges {
-				if _bridge.Name == name {
-					bridge.RoomID = _bridge.RoomID
-				}
-			}
 
-			err = bridge.JoinRooms()
+			err := bridge.JoinRooms()
 			if err != nil {
 				return err
 			}
@@ -220,7 +210,7 @@ func (b *Bridges) HandleLoginEvt(
 	}
 }
 
-func (b *Bridges) ProcessAndJoinInvites(
+func (b *Bridges) GetInvites(
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
@@ -253,7 +243,7 @@ func (m *MatrixClient) Sync() error {
 			}(bridge)
 
 			go func(bridge *Bridges) {
-				bridge.ProcessAndJoinInvites(evt)
+				bridge.GetInvites(evt)
 				wg.Done()
 			}(bridge)
 		}

@@ -392,7 +392,9 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	client, err := mautrix.NewClient(cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
+	client, err := mautrix.NewClient(
+		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
+
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
