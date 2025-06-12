@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"maunium.net/go/mautrix/event"
 )
 
 // var upgrader = websocket.Upgrader{}
@@ -63,8 +64,9 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].Bridges = append(
-		syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].Bridges,
+	ws.Bridge.ChLoginSyncEvt = make(chan *event.Event)
+	syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].LoginBridges = append(
+		syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].LoginBridges,
 		ws.Bridge,
 	)
 
@@ -130,9 +132,9 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		userSync := syncingClients.Users[ws.Bridge.Client.UserID.Localpart()]
 		if userSync != nil {
 			// remove bridge from syncing clients
-			for index, bridge := range userSync.Bridges {
+			for index, bridge := range userSync.MsgBridges {
 				if bridge.Name == ws.Bridge.Name {
-					userSync.Bridges = append(userSync.Bridges[:index], userSync.Bridges[index+1:]...)
+					userSync.LoginBridges = append(userSync.LoginBridges[:index], userSync.LoginBridges[index+1:]...)
 					break
 				}
 			}

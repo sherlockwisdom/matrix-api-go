@@ -407,7 +407,7 @@ func ApiAddDevice(c *gin.Context) {
 
 	bridge := &Bridges{}
 
-	for _, _bridge := range syncingClients.Users[username].Bridges {
+	for _, _bridge := range syncingClients.Users[username].MsgBridges {
 		if _bridge.Name == platformName {
 			bridge = _bridge
 		}
@@ -421,7 +421,7 @@ func ApiAddDevice(c *gin.Context) {
 		bridge.Client = client
 	}
 
-	syncingClients.Users[username].Bridges = append(syncingClients.Users[username].Bridges, bridge)
+	syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 
 	ws := Websockets{Bridge: bridge}
 

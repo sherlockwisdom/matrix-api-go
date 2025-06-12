@@ -15,10 +15,11 @@ type Controller struct {
 }
 
 type UserSync struct {
-	Name      string
-	Bridges   []*Bridges
-	Syncing   bool
-	SyncMutex sync.Mutex
+	Name         string
+	MsgBridges   []*Bridges
+	LoginBridges []*Bridges
+	Syncing      bool
+	SyncMutex    sync.Mutex
 }
 
 var cfg, cfgError = (&Conf{}).getConf()

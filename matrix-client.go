@@ -42,10 +42,10 @@ func (m *MatrixClient) ProcessActiveSessions(
 	userSync := syncingClients.Users[m.Client.UserID.Localpart()]
 	if userSync == nil {
 		userSync = &UserSync{
-			Name:      m.Client.UserID.Localpart(),
-			Bridges:   make([]*Bridges, 0),
-			Syncing:   false,
-			SyncMutex: sync.Mutex{},
+			Name:       m.Client.UserID.Localpart(),
+			MsgBridges: make([]*Bridges, 0),
+			Syncing:    false,
+			SyncMutex:  sync.Mutex{},
 		}
 		syncingClients.Users[m.Client.UserID.Localpart()] = userSync
 	}
@@ -211,15 +211,16 @@ func (m *MatrixClient) Create(username string, password string) (string, error) 
 	return resp.AccessToken, nil
 }
 
-// func (b *Bridges) HandleLoginEvt(
-// 	evt *event.Event,
-// ) {
-// 	if evt.Content.Raw["msgtype"] == "m.notice" && evt.RoomID == b.RoomID && evt.Sender != b.Client.UserID {
-// 		b.ChLoginSyncEvt <- evt
-// 	}
-// }
+func (b *Bridges) HandleLoginEvt(
+	evt *event.Event,
+) {
+	if b.BotName == evt.Sender.String() && (evt.Content.Raw["msgtype"] == "m.notice" ||
+		(event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) && evt.Type == event.EventMessage)) {
+		b.ChLoginSyncEvt <- evt
+	}
+}
 
-func (b *Bridges) GetInvites(
+func (b *Bridges) ProcessAndJoinInvites(
 	evt *event.Event,
 ) error {
 	if evt.Content.AsMember().Membership == event.MembershipInvite {
@@ -228,23 +229,6 @@ func (b *Bridges) GetInvites(
 			if err != nil {
 				return err
 			}
-
-			// room := Rooms{
-			// 	Client: b.Client,
-			// 	ID:     evt.RoomID,
-			// }
-			// if isBridge, _ := room.IsBridgeInviteForContact(evt); isBridge {
-			// 	var clientDB ClientDB = ClientDB{
-			// 		username: b.Client.UserID.Localpart(),
-			// 		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
-			// 	}
-
-			// 	roomName := *evt.StateKey
-			// 	log.Println("roomName:", roomName)
-
-			// 	clientDB.Init()
-			// 	clientDB.StoreRooms(evt.RoomID.String(), b.Name, roomName, false)
-			// }
 		}
 	}
 	return nil
@@ -255,7 +239,8 @@ func (m *MatrixClient) Sync() error {
 	m.Client.Syncer = syncer
 
 	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
-		bridges := syncingClients.Users[m.Client.UserID.Localpart()].Bridges
+		bridges := syncingClients.Users[m.Client.UserID.Localpart()].MsgBridges
+		loginBridges := syncingClients.Users[m.Client.UserID.Localpart()].LoginBridges
 
 		wg := sync.WaitGroup{}
 		for _, bridge := range bridges {
@@ -267,17 +252,22 @@ func (m *MatrixClient) Sync() error {
 				wg.Done()
 			}(bridge)
 
-			// go func() {
-			// 	bridge.HandleLoginEvt(evt)
-			// 	wg.Done()
-			// 	log.Print("Done syncing login evt")
-			// }()
-
 			go func(bridge *Bridges) {
-				bridge.GetInvites(evt)
+				bridge.ProcessAndJoinInvites(evt)
 				wg.Done()
 			}(bridge)
 		}
+
+		for _, bridge := range loginBridges {
+			bridge.Client = m.Client
+
+			wg.Add(1)
+			go func(bridge *Bridges) {
+				bridge.HandleLoginEvt(evt)
+				wg.Done()
+			}(bridge)
+		}
+
 		wg.Wait()
 	})
 
@@ -303,17 +293,17 @@ func (m *MatrixClient) SyncAllClients() error {
 			userSync := syncingClients.Users[user.Username]
 			if userSync == nil {
 				userSync = &UserSync{
-					Name:      user.Username,
-					Bridges:   make([]*Bridges, 0),
-					Syncing:   false,
-					SyncMutex: sync.Mutex{},
+					Name:       user.Username,
+					MsgBridges: make([]*Bridges, 0),
+					Syncing:    false,
+					SyncMutex:  sync.Mutex{},
 				}
 				syncingClients.Users[user.Username] = userSync
 			}
 			if userSync.Syncing {
 				continue
 			}
-			log.Printf("Syncing %d clients", len(userSync.Bridges)+1)
+			log.Printf("Syncing %d clients", len(userSync.MsgBridges)+1)
 
 			wg.Add(1)
 
@@ -380,9 +370,9 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 	}
 
 	userSync.Syncing = true
-	if len(syncingClients.Users[user.Username].Bridges) == 0 {
-		syncingClients.Users[user.Username].Bridges = append(
-			syncingClients.Users[user.Username].Bridges,
+	if len(syncingClients.Users[user.Username].MsgBridges) == 0 {
+		syncingClients.Users[user.Username].MsgBridges = append(
+			syncingClients.Users[user.Username].MsgBridges,
 			bridges...,
 		)
 	}
@@ -408,7 +398,7 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 
 func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 	log.Println("Syncing incoming messages for user:", userSync.Name)
-	bridges := userSync.Bridges
+	bridges := userSync.MsgBridges
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(bridges))
@@ -463,8 +453,8 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 						userSync := syncingClients.Users[bridge2.Client.UserID.Localpart()]
 						if userSync == nil {
 							userSync = &UserSync{
-								Name:    bridge2.Client.UserID.Localpart(),
-								Bridges: make([]*Bridges, 0),
+								Name:       bridge2.Client.UserID.Localpart(),
+								MsgBridges: make([]*Bridges, 0),
 							}
 						}
 						userSync.SyncMutex.Lock()
