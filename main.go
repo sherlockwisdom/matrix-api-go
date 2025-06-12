@@ -477,6 +477,13 @@ func main() {
 	tlsCert := cfg.Server.Tls.Crt
 	tlsKey := cfg.Server.Tls.Key
 
+	go func() {
+		err := (&MatrixClient{}).SyncAllClients()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	if tlsCert != "" && tlsKey != "" {
 		go func() {
 			err := MainWebsocket(true)
@@ -485,22 +492,13 @@ func main() {
 			}
 		}()
 		router.RunTLS(fmt.Sprintf(":%s", port), tlsCert, tlsKey)
-		return
+	} else {
+		go func() {
+			err := MainWebsocket(false)
+			if err != nil {
+				panic(err)
+			}
+		}()
+		router.Run(fmt.Sprintf("%s:%s", host, port))
 	}
-
-	go func() {
-		err := MainWebsocket(false)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	go func() {
-		err := (&MatrixClient{}).SyncAllClients()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	router.Run(fmt.Sprintf("%s:%s", host, port))
 }
