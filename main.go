@@ -323,6 +323,27 @@ func ApiSendMessage(c *gin.Context) {
 		return
 	}
 
+	// Validate required fields
+	if req.Username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+	if req.AccessToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Access token is required"})
+		return
+	}
+	if req.Message == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message is required"})
+		return
+	}
+
+	// Sanitize username
+	username, err := sanitizeUsername(req.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Sanitize message
 	message, err := sanitizeMessage(req.Message)
 	if err != nil {
@@ -333,10 +354,20 @@ func ApiSendMessage(c *gin.Context) {
 	cfg, _ := (&Conf{}).getConf()
 	homeServer := cfg.HomeServer
 
-	client, err := mautrix.NewClient(homeServer, "", req.AccessToken)
+	client, err := mautrix.NewClient(homeServer, id.NewUserID(username, cfg.HomeServerDomain), req.AccessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
+		return
+	}
+
+	// Validate access token
+	matrixClient := MatrixClient{
+		Client: client,
+	}
+	_, err = matrixClient.LoadActiveSessionsByAccessToken(req.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
 		return
 	}
 
@@ -345,7 +376,7 @@ func ApiSendMessage(c *gin.Context) {
 		UserID: client.UserID,
 	}
 
-	err = controller.SendMessage(req.Username, message, contactID, c.Param("platform"))
+	err = controller.SendMessage(username, message, contactID, c.Param("platform"))
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
