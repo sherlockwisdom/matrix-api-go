@@ -318,7 +318,7 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
 	log.Println("Fetching room members for", members, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, type, isBridge from rooms where members = ?",
+		"select clientUsername, roomID, name, members, isBridge from rooms where members = ?",
 	)
 	if err != nil {
 		return nil, err
@@ -337,10 +337,9 @@ func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
 		var _roomID string
 		var _name string
 		var _members string
-		var _type int
 		var isBridge bool
 
-		err = rows.Scan(&clientUsername, &_roomID, &_name, &_members, &_type, &isBridge)
+		err = rows.Scan(&clientUsername, &_roomID, &_name, &_members, &isBridge)
 		if err != nil {
 			return nil, err
 		}

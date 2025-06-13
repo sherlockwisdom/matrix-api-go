@@ -97,14 +97,9 @@ func (c *Controller) SendMessage(username, message, contact, platform string) er
 		return err
 	}
 
-	user, err := ks.FetchUser(username)
-	if err != nil {
-		return err
-	}
-
 	clientDb := ClientDB{
-		username: user.Username,
-		filepath: "db/" + user.Username + ".db",
+		username: username,
+		filepath: "db/" + username + ".db",
 	}
 
 	clientDb.Init()
@@ -113,6 +108,8 @@ func (c *Controller) SendMessage(username, message, contact, platform string) er
 	if err != nil {
 		return err
 	}
+
+	log.Println("Fetching rooms for", formattedUsername, rooms)
 
 	for _, room := range rooms {
 		resp, err := c.Client.SendText(

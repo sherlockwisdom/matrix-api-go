@@ -156,10 +156,13 @@ func sanitizeContact(contact string) (string, error) {
 	// Remove any whitespace
 	contact = strings.TrimSpace(contact)
 
-	// E.164 format validation: +[country code][number], total length 8-15 digits
-	validContact := regexp.MustCompile(`^\+[1-9]\d{7,14}$`)
+	// Remove plus sign if present
+	contact = strings.TrimPrefix(contact, "+")
+
+	// E.164 format validation: [country code][number], total length 8-15 digits
+	validContact := regexp.MustCompile(`^[1-9]\d{7,14}$`)
 	if !validContact.MatchString(contact) {
-		return "", fmt.Errorf("contact must be a valid E.164 phone number (e.g., +1234567890)")
+		return "", fmt.Errorf("contact must be a valid E.164 phone number (e.g., 1234567890 or +1234567890)")
 	}
 
 	return contact, nil
