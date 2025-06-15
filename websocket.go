@@ -159,16 +159,14 @@ func (w *Websockets) RegisterWebsocket(platformName string, username string) str
 }
 
 func MainWebsocket(tls bool) error {
-	cfg, err := (&Conf{}).getConf()
-	if err != nil {
-		panic(err)
-	}
+	port := cfg.Websocket.Port
+	host := cfg.Websocket.Host
 
 	if tls {
 		log.Println("Starting websocket with Tls")
-		return http.ListenAndServeTLS(":8090", cfg.Server.Tls.Crt, cfg.Server.Tls.Key, nil)
+		return http.ListenAndServeTLS(fmt.Sprintf("%s:%s", host, port), cfg.Websocket.Tls.Crt, cfg.Websocket.Tls.Key, nil)
 	}
 
 	log.Println("Starting websocket without Tls")
-	return http.ListenAndServe(":8090", nil)
+	return http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), nil)
 }

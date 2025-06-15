@@ -510,6 +510,7 @@ func main() {
 
 	host := cfg.Server.Host
 	port := cfg.Server.Port
+
 	tlsCert := cfg.Server.Tls.Crt
 	tlsKey := cfg.Server.Tls.Key
 
@@ -520,14 +521,13 @@ func main() {
 		}
 	}()
 
-	if tlsCert != "" && tlsKey != "" {
+	if cfg.Websocket.Tls.Crt != "" && cfg.Websocket.Tls.Key != "" {
 		go func() {
 			err := MainWebsocket(true)
 			if err != nil {
 				panic(err)
 			}
 		}()
-		router.RunTLS(fmt.Sprintf(":%s", port), tlsCert, tlsKey)
 	} else {
 		go func() {
 			err := MainWebsocket(false)
@@ -535,6 +535,11 @@ func main() {
 				panic(err)
 			}
 		}()
+	}
+
+	if tlsCert != "" && tlsKey != "" {
+		router.RunTLS(fmt.Sprintf(":%s", port), tlsCert, tlsKey)
+	} else {
 		router.Run(fmt.Sprintf("%s:%s", host, port))
 	}
 }

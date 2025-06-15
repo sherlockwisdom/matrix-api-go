@@ -23,6 +23,12 @@ type Tls struct {
 	Key string `yaml:"key"`
 }
 
+type ServerWebsocket struct {
+	Port string `yaml:"port"`
+	Host string `yaml:"host"`
+	Tls  Tls    `yaml:"tls"`
+}
+
 type Server struct {
 	Port string `yaml:"port"`
 	Host string `yaml:"host"`
@@ -37,6 +43,7 @@ type User struct {
 
 type Conf struct {
 	Server           Server                    `yaml:"server"`
+	Websocket        ServerWebsocket           `yaml:"websocket"`
 	KeystoreFilepath string                    `yaml:"keystore_filepath"`
 	HomeServer       string                    `yaml:"homeserver"`
 	HomeServerDomain string                    `yaml:"homeserver_domain"`
