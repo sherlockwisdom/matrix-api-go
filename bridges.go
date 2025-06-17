@@ -54,6 +54,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 			evt.Type == event.EventMessage {
 
 			failedCmd := bridgeCfg.Cmd["failed"]
+
 			matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
 			if err != nil {
 				log.Println("Error checking success pattern:", err)

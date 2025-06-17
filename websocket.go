@@ -102,6 +102,10 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		for {
 			data := <-ws.Bridge.ChImageSyncEvt
 			if data == nil {
+				err := c.WriteMessage(websocket.BinaryMessage, data)
+				if err != nil {
+					log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
+				}
 				c.Close()
 				return
 			}
