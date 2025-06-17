@@ -35,6 +35,17 @@ type Bridges struct {
 func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync.WaitGroup) {
 	since := time.Now().UnixMilli() - (100 * 1000)
 	log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChLoginSyncEvt)
+
+	var clientDb = ClientDB{
+		username: b.Client.UserID.Localpart(),
+		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+	}
+
+	if err := clientDb.Init(); err != nil {
+		log.Println("Error initializing client db:", err)
+		return
+	}
+
 	for {
 		evt := <-b.ChLoginSyncEvt
 		if evt.RoomID == b.RoomID &&
@@ -68,6 +79,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 				}
 
 				// return file, nil
+				clientDb.StoreActiveSessions(b.Client.UserID.Localpart(), file)
 				b.ChImageSyncEvt <- file
 				log.Println("New message adding device:", evt.Content.AsMessage().FileName)
 				continue
@@ -92,7 +104,19 @@ func (b *Bridges) startNewSession(loginCmd string) error {
 	return nil
 }
 
-func (b *Bridges) checkActiveSessions(client *mautrix.Client) (bool, error) {
+func (b *Bridges) checkActiveSessions() (bool, error) {
+	var clientDb = ClientDB{
+		username: b.Client.UserID.Localpart(),
+		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+	}
+
+	if err := clientDb.Init(); err != nil {
+		return false, err
+	}
+
+	if IsActiveSessionsExpired(&clientDb, b.Client.UserID.Localpart()) {
+		return false, nil
+	}
 	return true, nil
 }
 
@@ -117,30 +141,18 @@ func (b *Bridges) AddDevice() error {
 		return fmt.Errorf("login command not found for: %s", b.Name)
 	}
 
-	// bridge, err := getBridge(b.Client.UserID.Localpart(), b.Name)
-	// if err != nil {
-	// 	return err
-	// }
-	// b.RoomID = bridge.RoomID
-
-	// if bridge.RoomID == "" {
-	// 	return fmt.Errorf("room not found for bridge: %s", b.Name)
-	// }
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go b.processIncomingLoginMessages(bridgeCfg, &wg)
 
-	// check if active addding session
-	// then send message if no active sessions
-
-	activeSessions, err := b.checkActiveSessions(b.Client)
+	activeSessions, err := b.checkActiveSessions()
 	if err != nil {
 		log.Println("Failed checking active sessions", err)
 		return err
 	}
 
 	if !activeSessions {
+		clientDb.RemoveActiveSessions(b.Client.UserID.Localpart())
 		b.startNewSession(loginCmd)
 	}
 	wg.Wait()

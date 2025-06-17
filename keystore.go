@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"maunium.net/go/mautrix/event"
@@ -138,7 +139,9 @@ func (clientDb *ClientDB) Init() error {
 	name TEXT NOT NULL,
 	members TEXT NOT NULL,
 	isBridge INTEGER NOT NULL,
-	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+	sessions BLOB,
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	sessionsTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	UNIQUE(clientUsername, roomID, name, isBridge)
 	);
 
@@ -401,4 +404,86 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 	}
 
 	return bridges, err
+}
+
+func (clientDb *ClientDB) FetchActiveSessions(username string) ([]byte, time.Time, error) {
+	stmt, err := clientDb.connection.Prepare("select sessions, sessionsTimestamp from rooms where clientUsername = ? and isBridge = 1")
+	if err != nil {
+		return []byte{}, time.Time{}, err
+	}
+	defer stmt.Close()
+
+	var sessions []byte
+	var sessionsTimestamp time.Time
+	err = stmt.QueryRow(username).Scan(&sessions, &sessionsTimestamp)
+	if err != nil {
+		return []byte{}, time.Time{}, err
+	}
+	return sessions, sessionsTimestamp, nil
+}
+
+func (clientDb *ClientDB) StoreActiveSessions(username string, sessions []byte) error {
+	tx, err := clientDb.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("update rooms set sessions = ?, sessionsTimestamp = CURRENT_TIMESTAMP where clientUsername = ?")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(sessions, username)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (clientDb *ClientDB) RemoveActiveSessions(username string) error {
+	tx, err := clientDb.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("update rooms set sessions = NULL, sessionsTimestamp = CURRENT_TIMESTAMP where clientUsername = ?")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(username)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func IsActiveSessionsExpired(clientDb *ClientDB, username string) bool {
+	sessions, sessionsTimestamp, err := clientDb.FetchActiveSessions(username)
+	if err != nil {
+		return true
+	}
+
+	if sessionsTimestamp.IsZero() || len(sessions) == 0 {
+		return true
+	}
+
+	now := time.Now()
+	return now.After(sessionsTimestamp.Add(16 * time.Second))
 }
