@@ -93,7 +93,11 @@ type MessageResponse struct {
 }
 
 // DeviceResponse represents the response for successful device addition
-// @Description Response payload for successful device addition
+// @Description Response payload for successful device addition. The websocket_url is used to establish a connection that:
+// @Description - Receives media/images from the platform bridge
+// @Description - Handles login synchronization events
+// @Description - Receives existing active sessions if available
+// @Description - Closes when receiving nil data (indicating end of session or error)
 type DeviceResponse struct {
 	WebsocketURL string `json:"websocket_url" example:"ws://localhost:8080/ws/telegram/john_doe"`
 }
@@ -392,7 +396,12 @@ func ApiSendMessage(c *gin.Context) {
 
 // ApiAddDevice godoc
 // @Summary Adds a device for a given platform
-// @Description Registers a new device connection for the specified platform.
+// @Description Registers a new device connection for the specified platform and establishes a websocket connection.
+// @Description The websocket connection will:
+// @Description - Receive media/images from the platform bridge
+// @Description - Handle login synchronization events
+// @Description - Send existing active sessions if available
+// @Description - Close connection when receiving nil data (indicating end of session or error)
 // @Description Here are various platforms supported:
 // @Description 'wa' (for WhatsApp)
 // @Description 'signal' (for Signal)
@@ -400,7 +409,7 @@ func ApiSendMessage(c *gin.Context) {
 // @Produce  json
 // @Param   platform path string true "Platform Name" example:"wa"
 // @Param   payload body ClientBridgeJsonRequest true "Device Payload"
-// @Success 200 {object} DeviceResponse "Successfully added device"
+// @Success 200 {object} DeviceResponse "Successfully added device and established websocket connection"
 // @Failure 400 {object} ErrorResponse "Invalid request"
 // @Failure 401 {object} ErrorResponse "Invalid access token"
 // @Failure 500 {object} ErrorResponse "Internal server error"
