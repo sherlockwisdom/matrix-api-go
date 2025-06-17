@@ -250,7 +250,6 @@ func (m *MatrixClient) Sync() error {
 		}
 
 		for _, bridge := range loginBridges {
-			log.Println("Handling login event for bridge:", bridge.Name)
 			bridge.Client = m.Client
 
 			wg.Add(1)
@@ -412,7 +411,6 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 				}
 
 				go func(bridge2 *Bridges) {
-					log.Println("Received event:", evt.Sender.String(), evt.RoomID.String(), bridge2.BotName)
 					room := Rooms{
 						Client: bridge2.Client,
 						ID:     evt.RoomID,
@@ -433,7 +431,6 @@ func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 					isClientUser := evt.Sender.String() == m.Client.UserID.String()
 
 					if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
-						log.Println("Incoming message:", evt.Content.AsMessage().Body, bridge2.Name, bridge2.BotName)
 						incomingMessage := IncomingMessage{
 							RoomID: evt.RoomID,
 							Sender: evt.Sender,

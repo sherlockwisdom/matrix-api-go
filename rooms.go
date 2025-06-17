@@ -113,9 +113,6 @@ func (r *Rooms) GetRoomInfo() error {
 	// Get room name
 	var nameContent event.RoomNameEventContent
 	err := r.Client.StateEvent(context.Background(), r.ID, event.StateRoomName, "", &nameContent)
-	if err == nil {
-		println("Room name:", nameContent.Name, r.ID)
-	}
 
 	return err
 }

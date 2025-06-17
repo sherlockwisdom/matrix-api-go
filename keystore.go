@@ -205,7 +205,6 @@ func (clientDb *ClientDB) Store(accessToken string, password string) error {
 	}
 
 	defer stmt.Close()
-	log.Println("[+] Storing/Updating for username:", clientDb.username, ", AT:", accessToken)
 
 	_, err = stmt.Exec(clientDb.username, accessToken, password)
 	if err != nil {
@@ -251,7 +250,6 @@ func (clientDb *ClientDB) StoreRooms(
 	members string,
 	isBridge bool,
 ) error {
-	log.Println("[+] Storing to rooms:", roomID, platformName, members, isBridge)
 	tx, err := clientDb.connection.Begin()
 	if err != nil {
 		return err

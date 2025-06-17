@@ -32,29 +32,8 @@ type Bridges struct {
 	ChMsgEvt       chan *event.Event
 }
 
-func getBridge(username string, name string) (*Bridges, error) {
-	var clientDb = ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-
-	bridges, err := clientDb.FetchBridgeRooms(name)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, bridge := range bridges {
-		if bridge.Name == name {
-			bridge.RoomID = bridge.RoomID
-			return bridge, nil
-		}
-	}
-
-	return nil, nil
-}
-
 func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync.WaitGroup) {
-	since := time.Now().UnixMilli()
+	since := time.Now().UnixMilli() - (100 * 1000)
 	log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChLoginSyncEvt)
 	for {
 		evt := <-b.ChLoginSyncEvt
@@ -113,12 +92,12 @@ func (b *Bridges) startNewSession(loginCmd string) error {
 	return nil
 }
 
-func (b *Bridges) checkActiveSessions() (bool, error) {
-	return false, nil
+func (b *Bridges) checkActiveSessions(client *mautrix.Client) (bool, error) {
+	return true, nil
 }
 
 func (b *Bridges) AddDevice() error {
-	log.Println("Getting configs for:", b.Name)
+	log.Println("Getting configs for:", b.Name, b.RoomID)
 	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
 	if !ok {
 		return fmt.Errorf("bridge config not found for: %s", b.Name)
@@ -138,15 +117,15 @@ func (b *Bridges) AddDevice() error {
 		return fmt.Errorf("login command not found for: %s", b.Name)
 	}
 
-	bridge, err := getBridge(b.Client.UserID.Localpart(), b.Name)
-	if err != nil {
-		return err
-	}
-	b.RoomID = bridge.RoomID
+	// bridge, err := getBridge(b.Client.UserID.Localpart(), b.Name)
+	// if err != nil {
+	// 	return err
+	// }
+	// b.RoomID = bridge.RoomID
 
-	if bridge.RoomID == "" {
-		return fmt.Errorf("room not found for bridge: %s", b.Name)
-	}
+	// if bridge.RoomID == "" {
+	// 	return fmt.Errorf("room not found for bridge: %s", b.Name)
+	// }
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -155,8 +134,9 @@ func (b *Bridges) AddDevice() error {
 	// check if active addding session
 	// then send message if no active sessions
 
-	activeSessions, err := b.checkActiveSessions()
+	activeSessions, err := b.checkActiveSessions(b.Client)
 	if err != nil {
+		log.Println("Failed checking active sessions", err)
 		return err
 	}
 
