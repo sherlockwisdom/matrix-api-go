@@ -85,7 +85,7 @@ func (c *Controller) LoginProcess(password string) error {
 	m.Client.AccessToken = accessToken
 	err = m.ProcessActiveSessions(password)
 	if err != nil {
-		return err
+		log.Println("Error processing active sessions:", err)
 	}
 
 	return nil

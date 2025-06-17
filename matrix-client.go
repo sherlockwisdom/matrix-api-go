@@ -39,6 +39,7 @@ This function adds the user to the database and joins the bridge rooms
 func (m *MatrixClient) ProcessActiveSessions(
 	password string,
 ) error {
+	log.Println("Processing active sessions for user:", m.Client.UserID.Localpart())
 	userSync := syncingClients.Users[m.Client.UserID.Localpart()]
 	if userSync == nil {
 		userSync = &UserSync{
@@ -249,6 +250,7 @@ func (m *MatrixClient) Sync() error {
 		}
 
 		for _, bridge := range loginBridges {
+			log.Println("Handling login event for bridge:", bridge.Name)
 			bridge.Client = m.Client
 
 			wg.Add(1)

@@ -461,6 +461,7 @@ func ApiAddDevice(c *gin.Context) {
 		bridge.ChMsgEvt = make(chan *event.Event, 500)
 		bridge.Client = client
 	}
+	log.Println("Adding bridge:", bridge)
 
 	syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 
