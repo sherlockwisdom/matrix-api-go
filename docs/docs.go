@@ -115,7 +115,7 @@ const docTemplate = `{
         },
         "/{platform}/devices": {
             "post": {
-                "description": "Registers a new device connection for the specified platform.\nHere are various platforms supported:\n'wa' (for WhatsApp)\n'signal' (for Signal)",
+                "description": "Registers a new device connection for the specified platform and establishes a websocket connection.\nThe websocket connection will:\n- Receive media/images from the platform bridge\n- Handle login synchronization events\n- Send existing active sessions if available\n- Close connection when receiving nil data (indicating end of session or error)\nHere are various platforms supported:\n'wa' (for WhatsApp)\n'signal' (for Signal)",
                 "consumes": [
                     "application/json"
                 ],
@@ -143,7 +143,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successfully added device",
+                        "description": "Successfully added device and established websocket connection",
                         "schema": {
                             "$ref": "#/definitions/main.DeviceResponse"
                         }
@@ -189,7 +189,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Contact ID (E.164 phone number)",
+                        "description": "Contact ID (E.164 phone number without the plus)",
                         "name": "contact",
                         "in": "path",
                         "required": true
@@ -267,11 +267,15 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "Hello, world!"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
                 }
             }
         },
         "main.DeviceResponse": {
-            "description": "Response payload for successful device addition",
+            "description": "Response payload for successful device addition. The websocket_url is used to establish a connection that: - Receives media/images from the platform bridge - Handles login synchronization events - Receives existing active sessions if available - Closes when receiving nil data (indicating end of session or error)",
             "type": "object",
             "properties": {
                 "websocket_url": {
@@ -344,7 +348,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "ShortMesh API",
-	Description:      "Response payload for successful device addition",
+	Description:      "Response payload for successful device addition. The websocket_url is used to establish a connection that:\n- Receives media/images from the platform bridge\n- Handles login synchronization events\n- Receives existing active sessions if available\n- Closes when receiving nil data (indicating end of session or error)",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

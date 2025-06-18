@@ -488,6 +488,70 @@ func ApiAddDevice(c *gin.Context) {
 	})
 }
 
+func ApiListDevices(c *gin.Context) {
+	var bridgeJsonRequest ClientBridgeJsonRequest
+
+	if err := c.ShouldBindJSON(&bridgeJsonRequest); err != nil {
+		log.Printf("Invalid request payload: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON payload"})
+		return
+	}
+
+	username, err := sanitizeUsername(bridgeJsonRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	client, err := mautrix.NewClient(
+		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
+
+	if err != nil {
+		log.Printf("Failed to create Matrix client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
+		return
+	}
+
+	controller := Controller{
+		Client: client,
+		UserID: client.UserID,
+	}
+
+	err = controller.ListDevices(username, c.Param("platform"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"devices": "",
+	})
+}
+
+func ApiListWebhooks(c *gin.Context) {
+
+}
+
+func ApiAddWebhook(c *gin.Context) {
+
+}
+
+func ApiDeleteWebhook(c *gin.Context) {
+
+}
+
+func ApiDeleteDevice(c *gin.Context) {
+
+}
+
+func ApiDeletePlatform(c *gin.Context) {
+
+}
+
+func ApiDeleteAccount(c *gin.Context) {
+
+}
+
 func main() {
 	if cfgError != nil {
 		panic(cfgError)
@@ -512,8 +576,17 @@ func main() {
 
 	router.POST("/", ApiCreate)
 	router.POST("/login", ApiLogin)
-	router.POST("/:platform/message/:contact", ApiSendMessage)
 	router.POST("/:platform/devices", ApiAddDevice)
+	router.POST("/:platform/message/:contact", ApiSendMessage)
+
+	router.POST("/:platform/list/devices", ApiListDevices)
+	router.POST("/:platform/webhooks", ApiListWebhooks)
+	router.POST("/:platform/device/:device_id/webhook", ApiAddWebhook)
+
+	router.DELETE("/", ApiDeleteAccount)
+	router.DELETE("/devices/:device_id", ApiDeleteDevice)
+	router.DELETE("/platforms/:platform/devices/device_id", ApiDeletePlatform)
+
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	ks.Init()

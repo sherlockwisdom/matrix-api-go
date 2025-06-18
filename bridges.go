@@ -30,6 +30,7 @@ type Bridges struct {
 	ChLoginSyncEvt chan *event.Event
 	ChImageSyncEvt chan []byte
 	ChMsgEvt       chan *event.Event
+	ChBridgeEvents chan *event.Event
 }
 
 func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync.WaitGroup) {
@@ -91,15 +92,16 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 	defer wg.Done()
 }
 
-func (b *Bridges) startNewSession(loginCmd string) error {
-	log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, loginCmd, b.RoomID)
+func (b *Bridges) startNewSession(cmd string) error {
+	log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, cmd, b.RoomID)
 	_, err := b.Client.SendText(
 		context.Background(),
 		b.RoomID,
-		loginCmd,
+		cmd,
 	)
 
 	if err != nil {
+		log.Println("Error sending message:", err)
 		return err
 	}
 	return nil
@@ -211,6 +213,21 @@ func (b *Bridges) JoinRooms() error {
 
 	clientDb.StoreRooms(b.RoomID.String(), b.Name, b.BotName, true)
 	log.Println("[+] Stored room successfully for:", b.BotName, b.RoomID)
+
+	return nil
+}
+
+func (b *Bridges) ListDevices() error {
+	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
+	cmd := bridgeCfg.Cmd["devices"]
+	if !ok {
+		return fmt.Errorf("bridge config not found for: %s", b.Name)
+	}
+
+	err := b.startNewSession(cmd)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
