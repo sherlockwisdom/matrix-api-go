@@ -92,6 +92,39 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 	defer wg.Done()
 }
 
+func (b *Bridges) processBridgeIncomingMessages(ch *chan string) {
+	since := time.Now().UnixMilli()
+
+	log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChBridgeEvents)
+
+	var clientDb = ClientDB{
+		username: b.Client.UserID.Localpart(),
+		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+	}
+
+	if err := clientDb.Init(); err != nil {
+		log.Println("Error initializing client db:", err)
+		return
+	}
+
+	for {
+		evt := <-b.ChBridgeEvents
+		if evt.Content.Raw["msgtype"] == "m.notice" {
+			log.Println("Received event:", evt.Content.AsMessage().Body, evt.RoomID, b.RoomID, evt.Sender, " -> ", b.Client.UserID)
+		}
+
+		if evt.RoomID == b.RoomID &&
+			evt.Sender != b.Client.UserID &&
+			evt.Timestamp >= since &&
+			evt.Content.Raw["msgtype"] == "m.notice" &&
+			evt.Content.AsMessage().Format == "org.matrix.custom.html" {
+			log.Println("Received event:", evt.Content.AsMessage().Body)
+			*ch <- evt.Content.AsMessage().Body
+			break
+		}
+	}
+}
+
 func (b *Bridges) startNewSession(cmd string) error {
 	log.Printf("[+] %sBridge| Sending message %s to %v\n", b.Name, cmd, b.RoomID)
 	_, err := b.Client.SendText(
@@ -217,17 +250,28 @@ func (b *Bridges) JoinRooms() error {
 	return nil
 }
 
-func (b *Bridges) ListDevices() error {
+func (b *Bridges) ListDevices() ([]string, error) {
 	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
 	cmd := bridgeCfg.Cmd["devices"]
 	if !ok {
-		return fmt.Errorf("bridge config not found for: %s", b.Name)
+		return nil, fmt.Errorf("bridge config not found for: %s", b.Name)
 	}
+
+	ch := make(chan string)
+	go b.processBridgeIncomingMessages(&ch)
 
 	err := b.startNewSession(cmd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	select {
+	case msg := <-ch:
+		log.Println("Message from bridge:", msg)
+		return []string{msg}, nil
+	case <-time.After(25 * time.Second):
+		log.Println("Timeout waiting for message from bridge")
+	}
+
+	return nil, fmt.Errorf("timeout waiting for message from bridge")
 }

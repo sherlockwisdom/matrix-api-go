@@ -397,6 +397,7 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 			ChLoginSyncEvt: make(chan *event.Event, 1),
 			ChImageSyncEvt: make(chan []byte, 1),
 			ChMsgEvt:       make(chan *event.Event, 500),
+			ChBridgeEvents: make(chan *event.Event, 500),
 			RoomID:         id.RoomID(_roomID),
 			Name:           name,
 			BotName:        members,

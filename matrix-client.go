@@ -237,7 +237,14 @@ func (m *MatrixClient) Sync() error {
 		for _, bridge := range bridges {
 			bridge.Client = m.Client
 
-			wg.Add(2)
+			wg.Add(3)
+			go func(bridge *Bridges) {
+				if evt.Content.Raw["msgtype"] == "m.notice" {
+					bridge.ChBridgeEvents <- evt
+				}
+				wg.Done()
+			}(bridge)
+
 			go func(bridge *Bridges) {
 				bridge.ChMsgEvt <- evt
 				wg.Done()

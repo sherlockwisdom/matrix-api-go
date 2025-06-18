@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 
@@ -126,38 +125,15 @@ func (c *Controller) SendMessage(username, message, contact, platform string) er
 	return nil
 }
 
-func (c *Controller) ListDevices(username, platform string) error {
-	clientDb := ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDb.Init()
-
-	log.Println("Fetching bridge rooms for", platform)
-	bridges, err := clientDb.FetchBridgeRooms(username)
-	if err != nil {
-		return err
-	}
-
-	if len(bridges) == 0 {
-		return fmt.Errorf("no bridges found for %s", platform)
-	}
-
-	bridge := &Bridges{}
-	for _, _bridge := range bridges {
-		if _bridge.Name == platform {
-			bridge = _bridge
-			bridge.Client = c.Client
-			break
-		}
-	}
-
+func (c *Controller) ListDevices(username, platform string, bridge *Bridges) ([]string, error) {
 	log.Println("Found bridge:", bridge.Name)
 
-	err = bridge.ListDevices()
+	devices, err := bridge.ListDevices()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	log.Println("Devices:", devices)
+
+	return devices, nil
 }

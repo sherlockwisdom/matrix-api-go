@@ -456,7 +456,6 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	bridge := &Bridges{}
-
 	for _, _bridge := range syncingClients.Users[username].MsgBridges {
 		if _bridge.Name == platformName {
 			bridge = _bridge
@@ -469,10 +468,9 @@ func ApiAddDevice(c *gin.Context) {
 		bridge.ChImageSyncEvt = make(chan []byte, 500)
 		bridge.ChMsgEvt = make(chan *event.Event, 500)
 		bridge.Client = client
+		syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 	}
 	log.Println("Adding bridge:", bridge)
-
-	syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 
 	ws := Websockets{Bridge: bridge}
 
@@ -517,14 +515,40 @@ func ApiListDevices(c *gin.Context) {
 		UserID: client.UserID,
 	}
 
-	err = controller.ListDevices(username, c.Param("platform"))
+	platformName, err := sanitizePlatform(c.Param("platform"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	bridge := &Bridges{}
+	for _, _bridge := range syncingClients.Users[username].MsgBridges {
+		if _bridge.Name == platformName {
+			bridge = _bridge
+		}
+	}
+
+	if bridge.Name == "" {
+		bridge.Name = platformName
+		bridge.ChLoginSyncEvt = make(chan *event.Event, 500)
+		bridge.ChImageSyncEvt = make(chan []byte, 500)
+		bridge.ChMsgEvt = make(chan *event.Event, 500)
+		bridge.ChBridgeEvents = make(chan *event.Event, 500)
+		bridge.Client = client
+		syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
+	}
+
+	log.Println("Listing bridge:", bridge.ChBridgeEvents)
+
+	devices, err := controller.ListDevices(username, c.Param("platform"), bridge)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"devices": "",
+		"devices": devices,
 	})
 }
 
