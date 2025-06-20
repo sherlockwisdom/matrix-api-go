@@ -57,6 +57,7 @@ type ClientMessageJsonRequeset struct {
 	Username    string `json:"username" example:"john_doe"`
 	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
 	Message     string `json:"message" example:"Hello, world!"`
+	FileData    []byte `json:"file_data" example:"[file_data]"`
 }
 
 // ClientBridgeJsonRequest represents bridge connection details
@@ -380,7 +381,8 @@ func ApiSendMessage(c *gin.Context) {
 		UserID: client.UserID,
 	}
 
-	err = controller.SendMessage(username, message, contactID, c.Param("platform"))
+	err = controller.SendMessage(username, message, contactID, c.Param("platform"), req.FileData)
+
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
@@ -533,12 +535,10 @@ func ApiListDevices(c *gin.Context) {
 		bridge.ChLoginSyncEvt = make(chan *event.Event, 500)
 		bridge.ChImageSyncEvt = make(chan []byte, 500)
 		bridge.ChMsgEvt = make(chan *event.Event, 500)
-		bridge.ChBridgeEvents = make(chan *event.Event, 500)
+		bridge.ChNotice = make(chan *event.Event, 500)
 		bridge.Client = client
 		syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 	}
-
-	log.Println("Listing bridge:", bridge.ChBridgeEvents)
 
 	devices, err := controller.ListDevices(username, c.Param("platform"), bridge)
 

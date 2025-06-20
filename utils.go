@@ -164,3 +164,13 @@ func (c *Conf) FormatUsername(bridgeType string, username string) (string, error
 
 	return formattedUsername, nil
 }
+
+// ExtractBracketContent extracts the content inside the first pair of parentheses in the input string.
+func ExtractBracketContent(input string) (string, error) {
+	start := strings.Index(input, "(")
+	end := strings.Index(input, ")")
+	if start == -1 || end == -1 || end <= start+1 {
+		return "", fmt.Errorf("no content found in brackets")
+	}
+	return input[start+1 : end], nil
+}

@@ -145,6 +145,15 @@ func (clientDb *ClientDB) Init() error {
 	UNIQUE(clientUsername, roomID, name, isBridge)
 	);
 
+	CREATE TABLE IF NOT EXISTS devices ( 
+	id INTEGER PRIMARY KEY AUTOINCREMENT, 
+	clientUsername TEXT NOT NULL, 
+	deviceName TEXT NOT NULL, 
+	deviceID TEXT NOT NULL, 
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	UNIQUE(clientUsername, deviceName, deviceID)
+	);
+
 	`)
 
 	if err != nil {
@@ -396,8 +405,7 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 		bridges = append(bridges, &Bridges{
 			ChLoginSyncEvt: make(chan *event.Event, 1),
 			ChImageSyncEvt: make(chan []byte, 1),
-			ChMsgEvt:       make(chan *event.Event, 500),
-			ChBridgeEvents: make(chan *event.Event, 500),
+			ChMsgEvt:       make(chan *event.Event, 100),
 			RoomID:         id.RoomID(_roomID),
 			Name:           name,
 			BotName:        members,
@@ -487,4 +495,57 @@ func IsActiveSessionsExpired(clientDb *ClientDB, username string) bool {
 
 	now := time.Now()
 	return now.After(sessionsTimestamp.Add(16 * time.Second))
+}
+
+func (clientDb *ClientDB) StoreDevices(username string, deviceName string, deviceID string) error {
+	tx, err := clientDb.connection.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("insert into devices (clientUsername, deviceName, deviceID) values(?,?,?)")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(username, deviceName, deviceID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (clientDb *ClientDB) FetchDevices(username string) ([]string, error) {
+	stmt, err := clientDb.connection.Prepare("select deviceName, deviceID from devices where clientUsername = ?")
+	if err != nil {
+		return []string{}, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(username)
+	if err != nil {
+		return []string{}, err
+	}
+	defer rows.Close()
+
+	var devices []string
+	for rows.Next() {
+		var deviceName string
+		var deviceID string
+		err = rows.Scan(&deviceName, &deviceID)
+		if err != nil {
+			return []string{}, err
+		}
+		devices = append(devices, deviceName)
+	}
+
+	return devices, nil
 }

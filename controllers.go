@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"sync"
 
@@ -91,7 +90,7 @@ func (c *Controller) LoginProcess(password string) error {
 	return nil
 }
 
-func (c *Controller) SendMessage(username, message, contact, platform string) error {
+func (c *Controller) SendMessage(username, message, contact, platform string, fileData []byte) error {
 	formattedUsername, err := cfg.FormatUsername(platform, contact)
 	if err != nil {
 		return err
@@ -111,17 +110,51 @@ func (c *Controller) SendMessage(username, message, contact, platform string) er
 
 	log.Println("Fetching rooms for", formattedUsername, rooms)
 
-	for _, room := range rooms {
-		resp, err := c.Client.SendText(
-			context.Background(),
-			room.ID,
-			message,
-		)
-		if err != nil {
-			return err
-		}
-		log.Println("Sent message to", room.ID, resp.EventID)
-	}
+	// for _, room := range rooms {
+	// 	if fileData != nil {
+	// 		// Send PDF file
+	// 		uploadResp, err := c.Client.UploadBytesWithName(
+	// 			context.Background(),
+	// 			fileData,
+	// 			"application/pdf",
+	// 			"shortmesh.pdf",
+	// 		)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		fileMsg := &event.MessageEventContent{
+	// 			MsgType: event.MsgFile,
+	// 			Body:    "body",
+	// 			URL:     id.ContentURIString(uploadResp.ContentURI.String()),
+	// 			Info: &event.FileInfo{
+	// 				MimeType: "application/pdf",
+	// 				Size:     len(fileData),
+	// 			},
+	// 			FileName: "shortmesh.pdf",
+	// 		}
+	// 		resp, err := c.Client.SendMessageEvent(
+	// 			context.Background(),
+	// 			room.ID,
+	// 			event.EventMessage,
+	// 			fileMsg,
+	// 		)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		log.Println("Sent PDF to", room.ID, resp.EventID)
+	// 	} else {
+	// 		resp, err := c.Client.SendText(
+	// 			context.Background(),
+	// 			room.ID,
+	// 			message,
+	// 		)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		log.Println("Sent message to", room.ID, resp.EventID)
+	// 	}
+	// }
+
 	return nil
 }
 

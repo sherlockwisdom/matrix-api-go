@@ -229,7 +229,8 @@ func (m *MatrixClient) Sync() error {
 	syncer := mautrix.NewDefaultSyncer()
 	m.Client.Syncer = syncer
 
-	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
+	// syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
+	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		bridges := syncingClients.Users[m.Client.UserID.Localpart()].MsgBridges
 		loginBridges := syncingClients.Users[m.Client.UserID.Localpart()].LoginBridges
 
@@ -239,8 +240,9 @@ func (m *MatrixClient) Sync() error {
 
 			wg.Add(3)
 			go func(bridge *Bridges) {
-				if evt.Content.Raw["msgtype"] == "m.notice" {
-					bridge.ChBridgeEvents <- evt
+				if evt.Content.Raw["msgtype"] == "m.notice" && bridge.ChNotice != nil {
+					log.Println("received event and sending...", bridge.ChNotice)
+					bridge.ChNotice <- evt //flooded with requests
 				}
 				wg.Done()
 			}(bridge)
@@ -328,7 +330,6 @@ func (m *MatrixClient) SyncAllClients() error {
 }
 
 func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
-	log.Println("Syncing user:", user.Username, user.AccessToken)
 	homeServer := cfg.HomeServer
 	client, err := mautrix.NewClient(
 		homeServer,
@@ -348,10 +349,8 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 		filepath: "db/" + user.Username + ".db",
 	}
 
-	userSync.SyncMutex.Lock()
 	clientDb.Init()
 	bridges, err := clientDb.FetchBridgeRooms(user.Username)
-	userSync.SyncMutex.Unlock()
 
 	for _, bridge := range bridges {
 		bridge.Client = client
@@ -368,13 +367,12 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 	}
 
 	userSync.Syncing = true
-	if len(syncingClients.Users[user.Username].MsgBridges) == 0 {
+	if len(syncingClients.Users[user.Username].MsgBridges) < len(bridges) {
 		syncingClients.Users[user.Username].MsgBridges = append(
 			syncingClients.Users[user.Username].MsgBridges,
 			bridges...,
 		)
 	}
-	log.Println("Syncing clients:", syncingClients)
 
 	go func() {
 		err = mc.syncIncomingMessages(userSync)
@@ -396,81 +394,136 @@ func (m *MatrixClient) syncClient(user Users, userSync *UserSync) error {
 
 func (m *MatrixClient) syncIncomingMessages(userSync *UserSync) error {
 	log.Println("Syncing incoming messages for user:", userSync.Name)
-	bridges := userSync.MsgBridges
+	// bridges := userSync.MsgBridges
+	bridges := syncingClients.Users[m.Client.UserID.Localpart()].MsgBridges
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(bridges))
 	for _, bridge := range bridges {
-		go func(bridge1 *Bridges) {
-			for {
-				evt := <-bridge1.ChMsgEvt
-				if evt.RoomID == "" {
-					continue
-				}
+		log.Println("Listing device for", bridge)
+		go func() {
+			defer wg.Done()
+			devices, err := bridge.ListDevices()
+			if err != nil {
+				log.Println("Error listing devices:", err)
+				return
+			}
 
-				matchBridge, err := cfg.CheckUsernameTemplate(bridge1.Name, evt.Sender.String())
+			log.Println("Devices:", devices)
+			go func(bridge1 *Bridges, devices []string) {
+				err := m.syncListeners(bridge1)
 				if err != nil {
-					log.Println("Error checking if bridge is bot:", err)
+					log.Println("Error syncing listeners:", err)
+					return
 				}
+			}(bridge, devices)
+		}()
+	}
+	log.Println("Done listing....")
+	wg.Wait()
+	return nil
+}
 
-				if !matchBridge {
-					continue
-				}
+func (m *MatrixClient) syncStoreCreateRooms(userSync *UserSync, evt *event.Event, bridge *Bridges) error {
+	incomingMessage := IncomingMessage{
+		RoomID: evt.RoomID,
+		Sender: evt.Sender,
+	}
+	clientDb := ClientDB{
+		username: bridge.Client.UserID.Localpart(),
+		filepath: "db/" + bridge.Client.UserID.Localpart() + ".db",
+	}
+	if userSync == nil {
+		userSync = &UserSync{
+			Name:       bridge.Client.UserID.Localpart(),
+			MsgBridges: make([]*Bridges, 0),
+		}
+	}
+	userSync.SyncMutex.Lock()
+	clientDb.Init()
 
-				go func(bridge2 *Bridges) {
-					room := Rooms{
-						Client: bridge2.Client,
-						ID:     evt.RoomID,
+	err := clientDb.StoreRooms(
+		incomingMessage.RoomID.String(),
+		bridge.Name,
+		incomingMessage.Sender.String(),
+		false,
+	)
+	if err != nil {
+		log.Println("Error storing room:", err)
+	}
+	userSync.SyncMutex.Unlock()
+	return nil
+}
+
+func (m *MatrixClient) syncListeners(bridge *Bridges) error {
+	devices, err := bridge.ListDevices()
+	if err != nil {
+		log.Println("Error listing devices:", err)
+		return err
+	}
+
+	for {
+		evt := <-bridge.ChMsgEvt
+		if evt.RoomID == "" {
+			continue
+		}
+
+		matchBridge, err := cfg.CheckUsernameTemplate(bridge.Name, evt.Sender.String())
+		if err != nil {
+			log.Println("Error checking if bridge is bot:", err)
+		}
+
+		if !matchBridge {
+			continue
+		}
+
+		for _, device := range devices {
+			deviceName, err := sanitizeContact(device)
+			if err != nil {
+				log.Println("Failed to sanitize contact", deviceName)
+			}
+			formattedUsername, err := cfg.FormatUsername(bridge.Name, deviceName)
+			log.Println("Formatted username:", formattedUsername, evt.Sender.String())
+			if err != nil {
+				log.Println("Error formatting username:", err)
+				continue
+			}
+			if formattedUsername == evt.Sender.String() {
+				continue
+			}
+		}
+
+		go func(bridge2 *Bridges) {
+			room := Rooms{
+				Client: bridge2.Client,
+				ID:     evt.RoomID,
+			}
+			isManagementRoom, err := room.IsManagementRoom(bridge2.BotName)
+			if err != nil {
+				log.Println("Error checking if bridge is management room:", err)
+			}
+
+			isBridgeBot := func() bool {
+				for _, device := range devices {
+					if device == evt.Sender.String() {
+						return true
 					}
-					isManagementRoom, err := room.IsManagementRoom(bridge2.BotName)
+				}
+				return false
+			}()
+			isClientUser := evt.Sender.String() == m.Client.UserID.String()
+
+			if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
+				log.Println("Storing room:", evt.RoomID, evt.Sender.String(), bridge2.Client.UserID.String())
+				if evt.Sender.String() != bridge2.Client.UserID.String() {
+					userSync := syncingClients.Users[bridge2.Client.UserID.Localpart()]
+					err := m.syncStoreCreateRooms(userSync, evt, bridge2)
 					if err != nil {
-						log.Println("Error checking if bridge is management room:", err)
+						log.Println("Error storing room:", err)
 					}
-
-					isBridgeBot := func() bool {
-						for _, bridge := range bridges {
-							if bridge.BotName == evt.Sender.String() {
-								return true
-							}
-						}
-						return false
-					}()
-					isClientUser := evt.Sender.String() == m.Client.UserID.String()
-
-					if evt.Type == event.EventMessage && !isManagementRoom && !isBridgeBot && !isClientUser {
-						incomingMessage := IncomingMessage{
-							RoomID: evt.RoomID,
-							Sender: evt.Sender,
-						}
-						clientDb := ClientDB{
-							username: bridge2.Client.UserID.Localpart(),
-							filepath: "db/" + bridge2.Client.UserID.Localpart() + ".db",
-						}
-						userSync := syncingClients.Users[bridge2.Client.UserID.Localpart()]
-						if userSync == nil {
-							userSync = &UserSync{
-								Name:       bridge2.Client.UserID.Localpart(),
-								MsgBridges: make([]*Bridges, 0),
-							}
-						}
-						userSync.SyncMutex.Lock()
-						clientDb.Init()
-
-						err := clientDb.StoreRooms(
-							incomingMessage.RoomID.String(),
-							bridge2.Name,
-							incomingMessage.Sender.String(),
-							false,
-						)
-						if err != nil {
-							log.Println("Error storing room:", err)
-						}
-						userSync.SyncMutex.Unlock()
-					}
-				}(bridge1)
+				}
 			}
 		}(bridge)
 	}
-	wg.Wait()
-	return nil
+
 }
