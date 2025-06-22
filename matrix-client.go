@@ -312,7 +312,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 func (m *MatrixClient) processIncomingEvents(evt *event.Event) error {
 	for _, subscriber := range EventSubscribers {
 		go func(subscriber EventSubscriber) {
-			if subscriber.MsgType == evt.Content.AsMessage().MsgType {
+			if subscriber.MsgType == nil || *subscriber.MsgType == evt.Content.AsMessage().MsgType {
 				subscriber.Callback(evt)
 			}
 		}(subscriber)

@@ -433,14 +433,14 @@ func (clientDb *ClientDB) StoreActiveSessions(username string, sessions []byte) 
 		return err
 	}
 
-	stmt, err := tx.Prepare("update rooms set sessions = ?, sessionsTimestamp = CURRENT_TIMESTAMP where clientUsername = ?")
+	stmt, err := tx.Prepare("INSERT OR REPLACE INTO rooms (clientUsername, sessions, sessionsTimestamp) VALUES (?, ?, CURRENT_TIMESTAMP)")
 	if err != nil {
 		return err
 	}
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(sessions, username)
+	_, err = stmt.Exec(username, sessions)
 	if err != nil {
 		return err
 	}

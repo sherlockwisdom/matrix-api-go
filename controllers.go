@@ -12,7 +12,7 @@ import (
 
 type EventSubscriber struct {
 	Name     string
-	MsgType  event.MessageType
+	MsgType  *event.MessageType
 	Callback func(event *event.Event)
 }
 

@@ -36,7 +36,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 	for _, subscriber := range EventSubscribers {
 		if subscriber.Name ==
 			ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) &&
-			subscriber.MsgType == event.MsgNotice {
+			subscriber.MsgType == nil {
 			eventSubscriber = subscriber
 		}
 	}
@@ -44,7 +44,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 	if eventSubscriber.Name == "" {
 		eventSubscriber = EventSubscriber{
 			Name:    ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain),
-			MsgType: event.MsgImage,
+			MsgType: nil,
 			Callback: func(evt *event.Event) {
 				log.Println("Received bridge event:", evt.Content.AsMessage().Body, evt.RoomID, b.RoomID, evt.Sender, " -> ", b.Client.UserID)
 				if evt.RoomID == b.RoomID &&
@@ -68,7 +68,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 						}
 					}
 
-					if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
+					if evt.Content.AsMessage().MsgType.IsMedia() {
 						url := evt.Content.AsMessage().URL
 						file, err := ParseImage(b.Client, string(url))
 						if err != nil {
@@ -219,9 +219,10 @@ func (b *Bridges) JoinRooms() error {
 
 func (b *Bridges) ListDevices(ch chan []string) ([]string, error) {
 	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
+	eventType := event.MsgNotice
 	eventSubscriber := EventSubscriber{
 		Name:    eventSubName,
-		MsgType: event.MsgNotice,
+		MsgType: &eventType,
 		Callback: func(event *event.Event) {
 			log.Println("Received event:", event.Content.AsMessage().Body, event.RoomID, b.RoomID, event.Sender, " -> ", b.Client.UserID)
 
