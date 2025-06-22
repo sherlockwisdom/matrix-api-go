@@ -21,6 +21,7 @@ bridges:
   - signal:
       botname: "@signalbot:relaysms.me"
       username_template: "signal_{{.}}"
+      display_username_template: "{{.}} (Signal)"
       cmd:
         login: "!signal login"
         failed: "Login failed: too many QR code refreshes"
@@ -32,6 +33,7 @@ bridges:
   - wa:
       botname: "@whatsappbot:relaysms.me"
       username_template: "whatsapp_{{.}}"
+      display_username_template: "{{.}} (WA)"
       cmd:
         login: "!wa login qr"
         failed: "Login failed: Entering code or scanning QR timed out. Please try again."

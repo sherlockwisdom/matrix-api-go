@@ -278,28 +278,74 @@ func (b *Bridges) ListDevices() ([]string, error) {
 func (b *Bridges) JoinMemberRooms() error {
 	log.Println("Joining member rooms for:", b.Name)
 
+	devices, err := b.ListDevices()
+	log.Println("Devices:", devices)
+	if err != nil {
+		log.Println("Failed listing devices", err)
+		return err
+	}
+
+	clientDb := ClientDB{
+		username: b.Client.UserID.Localpart(),
+		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+	}
+	clientDb.Init()
+
 	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
 	eventSubName = eventSubName + "+join"
 	eventSubscriber := EventSubscriber{
 		Name:    eventSubName,
 		MsgType: nil,
 		Callback: func(event *event.Event) {
-			// devices, err := b.ListDevices()
-			// if err != nil {
-			// 	log.Println("Failed listing devices", err)
-			// 	return err
-			// }
+			log.Println("Received event:", event.RoomID)
+			if event.RoomID != "" {
+				room := Rooms{
+					Client: b.Client,
+					ID:     event.RoomID,
+				}
 
-			room := Rooms{
-				Client: b.Client,
-				ID:     event.RoomID,
+				isManagementRoom, err := room.IsManagementRoom(b.BotName)
+				if err != nil {
+					log.Println("Failed checking if room is management room", err)
+					return
+				}
+
+				if !isManagementRoom {
+					members, err := room.GetRoomMembers(b.Client, event.RoomID)
+					if err != nil {
+						log.Println("Failed getting room members", err)
+						return
+					}
+
+					for _, device := range devices {
+						formattedUsername, err := cfg.FormatUsername(b.Name, device)
+						if err != nil {
+							log.Println("Failed formatting username", err, device)
+							return
+						}
+
+						for _, member := range members {
+							if member.String() == formattedUsername {
+								for _, _member := range members {
+									matched, err := cfg.CheckUsernameTemplate(b.Name, _member.String())
+									if err != nil {
+										log.Println("Failed checking username template", err)
+										return
+									}
+
+									// if isConversation, then it's a group
+									if matched {
+										clientDb.StoreRooms(event.RoomID.String(), b.Name, member.String(), false)
+										log.Println("Stored room:", event.RoomID.String(), b.Name, member.String(), false)
+									}
+								}
+
+								return
+							}
+						}
+					}
+				}
 			}
-			name, err := room.GetRoomInfo()
-			if err != nil {
-				log.Println("Failed getting room info", err)
-				return
-			}
-			log.Println("Room name:", name)
 		},
 	}
 

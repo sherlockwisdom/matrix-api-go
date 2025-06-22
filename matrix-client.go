@@ -295,10 +295,16 @@ func (m *MatrixClient) syncClient(user Users) error {
 	}()
 
 	go func() {
+		wg := sync.WaitGroup{}
+		wg.Add(len(bridges))
 		for _, bridge := range bridges {
-			bridge.JoinMemberRooms()
-			log.Println("Joined member rooms for bridge:", bridge.Name)
+			go func(bridge *Bridges) {
+				bridge.JoinMemberRooms()
+				log.Println("Joined member rooms for bridge:", bridge.Name)
+				// wg.Done()
+			}(bridge)
 		}
+		wg.Wait()
 	}()
 
 	err = mc.Sync(ch)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -73,12 +72,6 @@ func (r *Rooms) IsManagementRoom(botName string) (bool, error) {
 	members, err := r.Client.JoinedMembers(context.Background(), r.ID)
 	if err != nil {
 		return false, err
-	}
-
-	_, err = r.GetRoomInfo()
-	if err != nil {
-		// return false, err
-		log.Println("Error getting room info:", err)
 	}
 
 	isSpace, err := r.IsSpaceRoom()
