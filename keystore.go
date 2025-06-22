@@ -43,7 +43,7 @@ func (ks *Keystore) CreateUser(username string, accessToken string) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT INTO users (username, accessToken) values(?,?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO users (username, accessToken) values(?,?)`)
 	if err != nil {
 		return err
 	}

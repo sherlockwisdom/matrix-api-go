@@ -166,7 +166,7 @@ func (c *Controller) ListDevices(username, platform string, bridge *Bridges) ([]
 		return nil, err
 	}
 
-	log.Println("Devices:", devices)
+	// log.Println("Devices:", devices)
 
 	return devices, nil
 }
