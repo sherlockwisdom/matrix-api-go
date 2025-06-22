@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -55,6 +54,28 @@ func GetWebsocketIndex(username string, platformName string) int {
 	return -1
 }
 
+func (ws *Websockets) listenForDisconnection(c *websocket.Conn, ch chan []byte) {
+	for {
+		_, _, err := c.ReadMessage()
+		if err != nil {
+			log.Printf("Client connection lost for user %s: %v", ws.Bridge.Client.UserID, err)
+			if bridgeCfg, ok := cfg.GetBridgeConfig(ws.Bridge.Name); ok {
+				log.Println("Sending cancel command to:", ws.Bridge.RoomID)
+				_, err = ws.Bridge.Client.SendText(
+					context.Background(),
+					ws.Bridge.RoomID,
+					bridgeCfg.Cmd["cancel"],
+				)
+
+				if err != nil {
+					log.Printf("Error sending cancel command to %s: %v", ws.Bridge.RoomID, err)
+				}
+				ch <- nil
+			}
+		}
+	}
+}
+
 func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Websocket handler called", ws.Bridge.Client.UserID)
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -63,60 +84,8 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1) // Increased to 2 for the new goroutine
-
-	// Add connection monitoring goroutine
-	go func(c *websocket.Conn) {
-		defer wg.Done()
-		for {
-			_, _, err := c.ReadMessage()
-			if err != nil {
-				log.Printf("Client connection lost for user %s: %v", ws.Bridge.Client.UserID, err)
-				if bridgeCfg, ok := cfg.GetBridgeConfig(ws.Bridge.Name); ok {
-					log.Println("Sending cancel command to:", ws.Bridge.RoomID)
-					_, err = ws.Bridge.Client.SendText(
-						context.Background(),
-						ws.Bridge.RoomID,
-						bridgeCfg.Cmd["cancel"],
-					)
-
-					if err != nil {
-						log.Printf("Error sending cancel command to %s: %v", ws.Bridge.RoomID, err)
-					}
-				}
-				break
-			}
-		}
-	}(conn)
-
-	go func(c *websocket.Conn) {
-		defer wg.Done()
-		for {
-			data := <-ws.Bridge.ChImageSyncEvt
-			if data == nil {
-				err := c.WriteMessage(websocket.BinaryMessage, data)
-				if err != nil {
-					log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
-				}
-				c.Close()
-				return
-			}
-
-			fmt.Println("Websocket sending message for:", ws.Bridge.Client.UserID)
-
-			if c == nil {
-				log.Println("Error connecting socket, client is nil")
-				return
-			}
-
-			err := c.WriteMessage(websocket.BinaryMessage, data)
-			if err != nil {
-				log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
-				return
-			}
-		}
-	}(conn)
+	ch := make(chan []byte)
+	go ws.listenForDisconnection(conn, ch)
 
 	clientDb := ClientDB{
 		username: ws.Bridge.Client.UserID.Localpart(),
@@ -141,10 +110,36 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		conn.WriteMessage(websocket.BinaryMessage, sessions)
 	}
 
-	err = ws.Bridge.AddDevice()
+	err = ws.Bridge.AddDevice(ch)
 	if err != nil {
 		log.Printf("Failed to add device: %v", err)
 		return
+	}
+
+	for {
+		log.Println("Waiting for data from channel")
+		data := <-ch
+		if data == nil {
+			err := conn.WriteMessage(websocket.BinaryMessage, data)
+			if err != nil {
+				log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
+			}
+			conn.Close()
+			break
+		}
+
+		fmt.Println("Websocket sending message for:", ws.Bridge.Client.UserID)
+
+		if conn == nil {
+			log.Println("Error connecting socket, client is nil")
+			break
+		}
+
+		err := conn.WriteMessage(websocket.BinaryMessage, data)
+		if err != nil {
+			log.Printf("Error sending message to client socket for user %s: %v", ws.Bridge.Client.UserID, err)
+			break
+		}
 	}
 
 	defer func() {
@@ -157,17 +152,9 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-
-	wg.Wait()
 }
 
 func (w *Websockets) RegisterWebsocket(platformName string, username string) string {
-	bridge := &Bridges{
-		Name:   platformName,
-		Client: w.Bridge.Client,
-	}
-	w.Bridge = bridge
-
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 
 	http.HandleFunc(websocketUrl, w.Handler)

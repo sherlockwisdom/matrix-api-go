@@ -19,8 +19,7 @@ type Bridges struct {
 	Client  *mautrix.Client
 }
 
-func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig) {
-
+func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan []byte) {
 	since := time.Now().UnixMilli() - (100 * 1000)
 
 	var clientDb = ClientDB{
@@ -33,48 +32,59 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig) {
 		return
 	}
 
-	for {
-		evt := <-b.ChLoginSyncEvt
-
-		if evt.RoomID == b.RoomID &&
-			evt.Sender != b.Client.UserID &&
-			evt.Timestamp >= since &&
-			evt.Type == event.EventMessage {
-
-			failedCmd := bridgeCfg.Cmd["failed"]
-
-			matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
-
-			if err != nil {
-				log.Println("Error checking success pattern:", err)
-				b.ChImageSyncEvt <- nil
-				break
-			}
-
-			if evt.Content.Raw["msgtype"] == "m.notice" {
-				if strings.Contains(evt.Content.AsMessage().Body, failedCmd) || matchesSuccess {
-					log.Println("Get new notice to failed or success:", evt)
-					b.ChImageSyncEvt <- nil
-					break
-				}
-			}
-
-			if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
-				url := evt.Content.AsMessage().URL
-				file, err := ParseImage(b.Client, string(url))
-				if err != nil {
-					log.Println("Error parsing image:", err)
-					b.ChImageSyncEvt <- nil
-					break
-				}
-
-				// return file, nil
-				clientDb.StoreActiveSessions(b.Client.UserID.Localpart(), file)
-				b.ChImageSyncEvt <- file
-				log.Println("New message adding device:", evt.Content.AsMessage().FileName)
-				continue
-			}
+	eventSubscriber := EventSubscriber{}
+	for _, subscriber := range EventSubscribers {
+		if subscriber.Name ==
+			ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) &&
+			subscriber.MsgType == event.MsgNotice {
+			eventSubscriber = subscriber
 		}
+	}
+
+	if eventSubscriber.Name == "" {
+		eventSubscriber = EventSubscriber{
+			Name:    ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain),
+			MsgType: event.MsgImage,
+			Callback: func(evt *event.Event) {
+				log.Println("Received bridge event:", evt.Content.AsMessage().Body, evt.RoomID, b.RoomID, evt.Sender, " -> ", b.Client.UserID)
+				if evt.RoomID == b.RoomID &&
+					evt.Sender != b.Client.UserID &&
+					evt.Timestamp >= since &&
+					evt.Type == event.EventMessage {
+
+					failedCmd := bridgeCfg.Cmd["failed"]
+
+					matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
+
+					if err != nil {
+						log.Println("Error checking success pattern:", err)
+						ch <- nil
+					}
+
+					if evt.Content.Raw["msgtype"] == "m.notice" {
+						if strings.Contains(evt.Content.AsMessage().Body, failedCmd) || matchesSuccess {
+							log.Println("Get new notice to failed or success:", evt)
+							ch <- nil
+						}
+					}
+
+					if event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) {
+						url := evt.Content.AsMessage().URL
+						file, err := ParseImage(b.Client, string(url))
+						if err != nil {
+							log.Println("Error parsing image:", err)
+							ch <- nil
+						}
+
+						// return file, nil
+						clientDb.StoreActiveSessions(b.Client.UserID.Localpart(), file)
+						ch <- file
+						log.Println("New message adding device:", evt.Content.AsMessage().FileName)
+					}
+				}
+			},
+		}
+		EventSubscribers = append(EventSubscribers, eventSubscriber)
 	}
 }
 
@@ -110,7 +120,7 @@ func (b *Bridges) checkActiveSessions() (bool, error) {
 	return true, nil
 }
 
-func (b *Bridges) AddDevice() error {
+func (b *Bridges) AddDevice(ch chan []byte) error {
 	log.Println("Getting configs for:", b.Name, b.RoomID)
 	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
 
@@ -132,7 +142,7 @@ func (b *Bridges) AddDevice() error {
 		return fmt.Errorf("login command not found for: %s", b.Name)
 	}
 
-	go b.processIncomingLoginMessages(bridgeCfg)
+	go b.processIncomingLoginMessages(bridgeCfg, ch)
 
 	activeSessions, err := b.checkActiveSessions()
 	if err != nil {
@@ -141,8 +151,13 @@ func (b *Bridges) AddDevice() error {
 	}
 
 	if !activeSessions {
+		log.Println("No active sessions found, removing active sessions")
 		clientDb.RemoveActiveSessions(b.Client.UserID.Localpart())
-		b.startNewSession(loginCmd)
+		err := b.startNewSession(loginCmd)
+		if err != nil {
+			log.Println("Failed starting new session", err)
+			return err
+		}
 	}
 
 	return nil
@@ -245,11 +260,4 @@ func (b *Bridges) ListDevices(ch chan []string) ([]string, error) {
 	devices := <-ch
 
 	return devices, nil
-}
-
-func (b *Bridges) syncNoticeHandlers() error {
-	for {
-		evt := <-b.ChNotice
-		log.Println("Received event:", evt.Content.AsMessage().Body, evt.RoomID, b.RoomID, evt.Sender, " -> ", b.Client.UserID)
-	}
 }

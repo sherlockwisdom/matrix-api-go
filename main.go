@@ -456,17 +456,20 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	ws := Websockets{}
+	controller := Controller{
+		Client: client,
+		UserID: client.UserID,
+	}
 
-	websocketUrl := ""
-	if index := GetWebsocketIndex(username, platformName); index > -1 {
-		websocketUrl = GlobalWebsocketConnection.Registry[index].Url
-	} else {
-		websocketUrl = ws.RegisterWebsocket(platformName, username)
+	websocketUrl, err := controller.AddDevice(username, platformName)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"websocket_url": string(websocketUrl),
+		"websocket_url": websocketUrl,
 	})
 }
 

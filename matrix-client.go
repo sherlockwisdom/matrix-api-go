@@ -181,15 +181,6 @@ func (m *MatrixClient) Create(username string, password string) (string, error) 
 	return resp.AccessToken, nil
 }
 
-func (b *Bridges) HandleLoginEvt(
-	evt *event.Event,
-) {
-	if b.BotName == evt.Sender.String() && (evt.Content.Raw["msgtype"] == "m.notice" ||
-		(event.MessageType.IsMedia(evt.Content.AsMessage().MsgType) && evt.Type == event.EventMessage)) {
-		b.ChLoginSyncEvt <- evt
-	}
-}
-
 func (b *Bridges) GetInvites(
 	evt *event.Event,
 ) error {

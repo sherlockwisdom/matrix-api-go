@@ -7,7 +7,6 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -403,12 +402,9 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 		}
 
 		bridges = append(bridges, &Bridges{
-			ChLoginSyncEvt: make(chan *event.Event, 1),
-			ChImageSyncEvt: make(chan []byte, 1),
-			ChMsgEvt:       make(chan *event.Event, 100),
-			RoomID:         id.RoomID(_roomID),
-			Name:           name,
-			BotName:        members,
+			RoomID:  id.RoomID(_roomID),
+			Name:    name,
+			BotName: members,
 		})
 	}
 

@@ -203,3 +203,43 @@ func (c *Controller) ListDevices(username, platform string) ([]string, error) {
 
 	return devices, nil
 }
+
+func (c *Controller) AddDevice(username, platform string) (string, error) {
+	websocketUrl := ""
+	if index := GetWebsocketIndex(username, platform); index > -1 {
+		websocketUrl = GlobalWebsocketConnection.Registry[index].Url
+	} else {
+		clientDb := ClientDB{
+			username: username,
+			filepath: "db/" + username + ".db",
+		}
+		clientDb.Init()
+
+		bridges, err := clientDb.FetchBridgeRooms(username)
+		if err != nil {
+			return "", err
+		}
+
+		bridge := &Bridges{
+			Name:   platform,
+			Client: c.Client,
+		}
+
+		for _, _bridge := range bridges {
+			if _bridge.Name == platform {
+				bridge.RoomID = _bridge.RoomID
+				break
+			}
+		}
+
+		if bridge.RoomID == "" {
+			return "", fmt.Errorf("bridge room not found for: %s", platform)
+		}
+
+		ws := Websockets{Bridge: bridge}
+
+		websocketUrl = ws.RegisterWebsocket(platform, username)
+	}
+
+	return websocketUrl, nil
+}
