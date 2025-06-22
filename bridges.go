@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -13,29 +12,16 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-type BridgesInterface interface {
-	AddDevice(
-		client *mautrix.Client,
-		roomId string,
-	)
-	HandleMessages(*event.Event) (bool, error)
-	DefaultRoom() (string, error)
-}
-
 type Bridges struct {
-	Name           string
-	BotName        string
-	RoomID         id.RoomID
-	Client         *mautrix.Client
-	ChLoginSyncEvt chan *event.Event
-	ChImageSyncEvt chan []byte
-	ChMsgEvt       chan *event.Event
-	ChNotice       chan *event.Event
+	Name    string
+	BotName string
+	RoomID  id.RoomID
+	Client  *mautrix.Client
 }
 
-func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync.WaitGroup) {
+func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig) {
+
 	since := time.Now().UnixMilli() - (100 * 1000)
-	log.Printf("Waiting for events %s %p\n", b.Client.UserID, b.ChLoginSyncEvt)
 
 	var clientDb = ClientDB{
 		username: b.Client.UserID.Localpart(),
@@ -49,6 +35,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 
 	for {
 		evt := <-b.ChLoginSyncEvt
+
 		if evt.RoomID == b.RoomID &&
 			evt.Sender != b.Client.UserID &&
 			evt.Timestamp >= since &&
@@ -57,6 +44,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 			failedCmd := bridgeCfg.Cmd["failed"]
 
 			matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
+
 			if err != nil {
 				log.Println("Error checking success pattern:", err)
 				b.ChImageSyncEvt <- nil
@@ -88,8 +76,6 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, wg *sync
 			}
 		}
 	}
-
-	defer wg.Done()
 }
 
 func (b *Bridges) startNewSession(cmd string) error {
@@ -120,12 +106,14 @@ func (b *Bridges) checkActiveSessions() (bool, error) {
 	if IsActiveSessionsExpired(&clientDb, b.Client.UserID.Localpart()) {
 		return false, nil
 	}
+
 	return true, nil
 }
 
 func (b *Bridges) AddDevice() error {
 	log.Println("Getting configs for:", b.Name, b.RoomID)
 	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
+
 	if !ok {
 		return fmt.Errorf("bridge config not found for: %s", b.Name)
 	}
@@ -144,9 +132,7 @@ func (b *Bridges) AddDevice() error {
 		return fmt.Errorf("login command not found for: %s", b.Name)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go b.processIncomingLoginMessages(bridgeCfg, &wg)
+	go b.processIncomingLoginMessages(bridgeCfg)
 
 	activeSessions, err := b.checkActiveSessions()
 	if err != nil {
@@ -158,7 +144,6 @@ func (b *Bridges) AddDevice() error {
 		clientDb.RemoveActiveSessions(b.Client.UserID.Localpart())
 		b.startNewSession(loginCmd)
 	}
-	wg.Wait()
 
 	return nil
 }

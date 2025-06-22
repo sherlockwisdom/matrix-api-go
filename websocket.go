@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"maunium.net/go/mautrix/event"
 )
 
 // var upgrader = websocket.Upgrader{}
@@ -64,10 +63,8 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	ws.Bridge.ChLoginSyncEvt = make(chan *event.Event)
-
 	var wg sync.WaitGroup
-	wg.Add(2) // Increased to 2 for the new goroutine
+	wg.Add(1) // Increased to 2 for the new goroutine
 
 	// Add connection monitoring goroutine
 	go func(c *websocket.Conn) {
@@ -150,10 +147,27 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer func() {
+		eventSubName := ReverseAliasForEventSubscriber(ws.Bridge.Client.UserID.Localpart(), ws.Bridge.Name, cfg.HomeServerDomain)
+		for index, subscriber := range EventSubscribers {
+			if subscriber.Name == eventSubName {
+				EventSubscribers = append(EventSubscribers[:index], EventSubscribers[index+1:]...)
+				log.Println("Removed event subscriber:", eventSubName)
+				break
+			}
+		}
+	}()
+
 	wg.Wait()
 }
 
 func (w *Websockets) RegisterWebsocket(platformName string, username string) string {
+	bridge := &Bridges{
+		Name:   platformName,
+		Client: w.Bridge.Client,
+	}
+	w.Bridge = bridge
+
 	websocketUrl := fmt.Sprintf("/ws/%s/%s", platformName, username)
 
 	http.HandleFunc(websocketUrl, w.Handler)

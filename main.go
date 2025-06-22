@@ -13,7 +13,6 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"maunium.net/go/mautrix"
-	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 	// "maunium.net/go/mautrix/id"
 )
@@ -457,17 +456,7 @@ func ApiAddDevice(c *gin.Context) {
 		return
 	}
 
-	bridge := &Bridges{}
-	if bridge.Name == "" {
-		bridge.Name = platformName
-		bridge.ChLoginSyncEvt = make(chan *event.Event, 500)
-		bridge.ChImageSyncEvt = make(chan []byte, 500)
-		bridge.ChMsgEvt = make(chan *event.Event, 500)
-		bridge.Client = client
-	}
-	log.Println("Adding bridge:", bridge)
-
-	ws := Websockets{Bridge: bridge}
+	ws := Websockets{}
 
 	websocketUrl := ""
 	if index := GetWebsocketIndex(username, platformName); index > -1 {
