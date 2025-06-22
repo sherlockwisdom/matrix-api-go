@@ -217,16 +217,28 @@ func (b *Bridges) JoinRooms() error {
 	return nil
 }
 
-func (b *Bridges) ListDevices(ch chan []string) ([]string, error) {
+func (b *Bridges) ListDevices() ([]string, error) {
+	ch := make(chan []string)
 	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
 	eventType := event.MsgNotice
+	eventSince := time.Now()
 	eventSubscriber := EventSubscriber{
 		Name:    eventSubName,
 		MsgType: &eventType,
+		Since:   &eventSince,
+		RoomID:  b.RoomID,
 		Callback: func(event *event.Event) {
-			log.Println("Received event:", event.Content.AsMessage().Body, event.RoomID, b.RoomID, event.Sender, " -> ", b.Client.UserID)
-
-			ch <- strings.Split(event.Content.AsMessage().Body, "\n")
+			devicesRaw := strings.Split(event.Content.AsMessage().Body, "\n")
+			devices := make([]string, 0)
+			for _, device := range devicesRaw {
+				deviceName, err := ExtractBracketContent(device)
+				if err != nil {
+					log.Println("Failed extracting device name", err)
+					continue
+				}
+				devices = append(devices, deviceName)
+			}
+			ch <- devices
 
 			defer func() {
 				for index, subscriber := range EventSubscribers {
@@ -261,4 +273,37 @@ func (b *Bridges) ListDevices(ch chan []string) ([]string, error) {
 	devices := <-ch
 
 	return devices, nil
+}
+
+func (b *Bridges) JoinMemberRooms() error {
+	log.Println("Joining member rooms for:", b.Name)
+
+	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
+	eventSubName = eventSubName + "+join"
+	eventSubscriber := EventSubscriber{
+		Name:    eventSubName,
+		MsgType: nil,
+		Callback: func(event *event.Event) {
+			// devices, err := b.ListDevices()
+			// if err != nil {
+			// 	log.Println("Failed listing devices", err)
+			// 	return err
+			// }
+
+			room := Rooms{
+				Client: b.Client,
+				ID:     event.RoomID,
+			}
+			name, err := room.GetRoomInfo()
+			if err != nil {
+				log.Println("Failed getting room info", err)
+				return
+			}
+			log.Println("Room name:", name)
+		},
+	}
+
+	EventSubscribers = append(EventSubscribers, eventSubscriber)
+
+	return nil
 }

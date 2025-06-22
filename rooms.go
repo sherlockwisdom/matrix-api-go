@@ -16,15 +16,6 @@ type Rooms struct {
 	Members  map[string]string
 }
 
-// func (r *Rooms) Join(
-// 	client *mautrix.Client,
-// 	roomId id.RoomID,
-// ) error {
-// 	log.Println("[*] Joining room:", roomId)
-// 	_, err := client.JoinRoomByID(context.Background(), roomId)
-// 	return err
-// }
-
 func (r *Rooms) IsBridgeInviteForContact(evt *event.Event) (bool, error) {
 	// TODO: check if the invite is from a bridge bot but not a bridge room
 	for _, bridge := range cfg.Bridges {
@@ -84,7 +75,7 @@ func (r *Rooms) IsManagementRoom(botName string) (bool, error) {
 		return false, err
 	}
 
-	err = r.GetRoomInfo()
+	_, err = r.GetRoomInfo()
 	if err != nil {
 		// return false, err
 		log.Println("Error getting room info:", err)
@@ -109,12 +100,15 @@ func (r *Rooms) IsManagementRoom(botName string) (bool, error) {
 	return false, nil
 }
 
-func (r *Rooms) GetRoomInfo() error {
+func (r *Rooms) GetRoomInfo() (string, error) {
 	// Get room name
 	var nameContent event.RoomNameEventContent
 	err := r.Client.StateEvent(context.Background(), r.ID, event.StateRoomName, "", &nameContent)
+	if err != nil {
+		return "", err
+	}
 
-	return err
+	return nameContent.Name, nil
 }
 
 // IsSpaceRoom checks if the given room is a space

@@ -172,7 +172,10 @@ func ExtractBracketContent(input string) (string, error) {
 	if start == -1 || end == -1 || end <= start+1 {
 		return "", fmt.Errorf("no content found in brackets")
 	}
-	return input[start+1 : end], nil
+	content := input[start+1 : end]
+	// Remove the "+" character from the content
+	content = strings.ReplaceAll(content, "+", "")
+	return content, nil
 }
 
 func ReverseAliasForEventSubscriber(username, bridgeName, homeserver string) string {

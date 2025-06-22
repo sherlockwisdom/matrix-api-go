@@ -210,8 +210,6 @@ func (m *MatrixClient) Sync(ch chan *event.Event) error {
 	return nil
 }
 
-var syncingUsers = make(map[string][]string)
-
 func (m *MatrixClient) SyncAllClients() error {
 	log.Println("Syncing all clients")
 	var wg sync.WaitGroup
@@ -271,14 +269,11 @@ func (m *MatrixClient) syncClient(user Users) error {
 
 	// insert bridge names into syncingUsers if not already present
 	for _, bridge := range bridges {
+		bridge.Client = client
 		if _, ok := syncingUsers[user.Username]; !ok {
 			syncingUsers[user.Username] = []string{}
 		}
 		syncingUsers[user.Username] = append(syncingUsers[user.Username], bridge.Name)
-	}
-
-	for _, bridge := range bridges {
-		bridge.Client = client
 	}
 
 	if len(bridges) == 0 {
@@ -299,6 +294,13 @@ func (m *MatrixClient) syncClient(user Users) error {
 		}
 	}()
 
+	go func() {
+		for _, bridge := range bridges {
+			bridge.JoinMemberRooms()
+			log.Println("Joined member rooms for bridge:", bridge.Name)
+		}
+	}()
+
 	err = mc.Sync(ch)
 
 	if err != nil {
@@ -313,6 +315,14 @@ func (m *MatrixClient) processIncomingEvents(evt *event.Event) error {
 	for _, subscriber := range EventSubscribers {
 		go func(subscriber EventSubscriber) {
 			if subscriber.MsgType == nil || *subscriber.MsgType == evt.Content.AsMessage().MsgType {
+				if subscriber.RoomID != "" && subscriber.RoomID != evt.RoomID {
+					return
+				}
+
+				if subscriber.Since != nil && subscriber.Since.After(time.Unix(evt.Timestamp, 0)) {
+					return
+				}
+
 				subscriber.Callback(evt)
 			}
 		}(subscriber)

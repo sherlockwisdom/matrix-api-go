@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
+var syncingUsers = make(map[string][]string)
+
 type EventSubscriber struct {
 	Name     string
 	MsgType  *event.MessageType
 	Callback func(event *event.Event)
+	Since    *time.Time
+	RoomID   id.RoomID
 }
 
 var EventSubscribers = make([]EventSubscriber, 0)
@@ -193,13 +198,10 @@ func (c *Controller) ListDevices(username, platform string) ([]string, error) {
 
 	log.Println("Listing devices for", username, platform, bridge.RoomID)
 
-	ch := make(chan []string, 1)
-	devices, err := bridge.ListDevices(ch)
+	devices, err := bridge.ListDevices()
 	if err != nil {
 		return nil, err
 	}
-
-	close(ch)
 
 	return devices, nil
 }
