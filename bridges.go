@@ -217,20 +217,47 @@ func (b *Bridges) JoinRooms() error {
 	return nil
 }
 
-func (b *Bridges) ListDevices() ([]string, error) {
-	var clientDb = ClientDB{
-		username: b.Client.UserID.Localpart(),
-		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
+func (b *Bridges) ListDevices(ch chan []string) ([]string, error) {
+	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
+	eventSubscriber := EventSubscriber{
+		Name:    eventSubName,
+		MsgType: event.MsgNotice,
+		Callback: func(event *event.Event) {
+			log.Println("Received event:", event.Content.AsMessage().Body, event.RoomID, b.RoomID, event.Sender, " -> ", b.Client.UserID)
+
+			ch <- strings.Split(event.Content.AsMessage().Body, "\n")
+
+			defer func() {
+				for index, subscriber := range EventSubscribers {
+					if subscriber.Name == eventSubName {
+						EventSubscribers = append(EventSubscribers[:index], EventSubscribers[index+1:]...)
+						log.Println("Removed event subscriber:", eventSubName)
+						break
+					}
+				}
+			}()
+		},
 	}
 
-	if err := clientDb.Init(); err != nil {
-		return nil, err
-	}
+	EventSubscribers = append(EventSubscribers, eventSubscriber)
 
-	devices, err := clientDb.FetchDevices(b.Client.UserID.Localpart())
+	bridgeCfg, ok := cfg.GetBridgeConfig(b.Name)
+	if !ok {
+		return nil, fmt.Errorf("bridge config not found for: %s", b.Name)
+	}
+	log.Println("Event subscriber name:", eventSubName)
+
+	_, err := b.Client.SendText(
+		context.Background(),
+		b.RoomID,
+		bridgeCfg.Cmd["devices"],
+	)
+
 	if err != nil {
 		return nil, err
 	}
+
+	devices := <-ch
 
 	return devices, nil
 }

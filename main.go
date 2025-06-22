@@ -458,19 +458,12 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	bridge := &Bridges{}
-	for _, _bridge := range syncingClients.Users[username].MsgBridges {
-		if _bridge.Name == platformName {
-			bridge = _bridge
-		}
-	}
-
 	if bridge.Name == "" {
 		bridge.Name = platformName
 		bridge.ChLoginSyncEvt = make(chan *event.Event, 500)
 		bridge.ChImageSyncEvt = make(chan []byte, 500)
 		bridge.ChMsgEvt = make(chan *event.Event, 500)
 		bridge.Client = client
-		syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
 	}
 	log.Println("Adding bridge:", bridge)
 
@@ -523,24 +516,8 @@ func ApiListDevices(c *gin.Context) {
 		return
 	}
 
-	bridge := &Bridges{}
-	for _, _bridge := range syncingClients.Users[username].MsgBridges {
-		if _bridge.Name == platformName {
-			bridge = _bridge
-		}
-	}
-
-	if bridge.Name == "" {
-		bridge.Name = platformName
-		bridge.ChLoginSyncEvt = make(chan *event.Event, 500)
-		bridge.ChImageSyncEvt = make(chan []byte, 500)
-		bridge.ChMsgEvt = make(chan *event.Event, 500)
-		bridge.ChNotice = make(chan *event.Event, 500)
-		bridge.Client = client
-		syncingClients.Users[username].MsgBridges = append(syncingClients.Users[username].MsgBridges, bridge)
-	}
-
-	devices, err := controller.ListDevices(username, c.Param("platform"), bridge)
+	log.Println("Listing devices for", username, platformName)
+	devices, err := controller.ListDevices(username, platformName)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})

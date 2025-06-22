@@ -1,12 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"sync"
 
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
+
+type EventSubscriber struct {
+	Name     string
+	MsgType  event.MessageType
+	Callback func(event *event.Event)
+}
+
+var EventSubscribers = make([]EventSubscriber, 0)
 
 type Controller struct {
 	Client   *mautrix.Client
@@ -38,10 +48,6 @@ var GlobalController = Controller{
 
 var ks = Keystore{
 	filepath: cfg.KeystoreFilepath,
-}
-
-var syncingClients = SyncingClients{
-	Users: make(map[string]*UserSync),
 }
 
 func (c *Controller) CreateProcess(password string) error {
@@ -158,15 +164,42 @@ func (c *Controller) SendMessage(username, message, contact, platform string, fi
 	return nil
 }
 
-func (c *Controller) ListDevices(username, platform string, bridge *Bridges) ([]string, error) {
-	log.Println("Found bridge:", bridge.Name)
+func (c *Controller) ListDevices(username, platform string) ([]string, error) {
+	bridge := &Bridges{
+		Name:   platform,
+		Client: c.Client,
+	}
 
-	devices, err := bridge.ListDevices()
+	clientDb := ClientDB{
+		username: username,
+		filepath: "db/" + username + ".db",
+	}
+	clientDb.Init()
+	bridges, err := clientDb.FetchBridgeRooms(username)
 	if err != nil {
 		return nil, err
 	}
 
-	// log.Println("Devices:", devices)
+	for _, _bridge := range bridges {
+		if _bridge.Name == platform {
+			bridge.RoomID = _bridge.RoomID
+			break
+		}
+	}
+
+	if bridge.RoomID == "" {
+		return nil, fmt.Errorf("bridge room not found for: %s", platform)
+	}
+
+	log.Println("Listing devices for", username, platform, bridge.RoomID)
+
+	ch := make(chan []string, 1)
+	devices, err := bridge.ListDevices(ch)
+	if err != nil {
+		return nil, err
+	}
+
+	close(ch)
 
 	return devices, nil
 }

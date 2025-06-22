@@ -65,10 +65,6 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ws.Bridge.ChLoginSyncEvt = make(chan *event.Event)
-	syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].LoginBridges = append(
-		syncingClients.Users[ws.Bridge.Client.UserID.Localpart()].LoginBridges,
-		ws.Bridge,
-	)
 
 	var wg sync.WaitGroup
 	wg.Add(2) // Increased to 2 for the new goroutine
@@ -153,20 +149,6 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to add device: %v", err)
 		return
 	}
-
-	defer func() {
-		log.Println("Falsifying syncing clients for user:", ws.Bridge.Client.UserID.Localpart())
-		userSync := syncingClients.Users[ws.Bridge.Client.UserID.Localpart()]
-		if userSync != nil {
-			// remove bridge from syncing clients
-			for index, bridge := range userSync.MsgBridges {
-				if bridge.Name == ws.Bridge.Name {
-					userSync.LoginBridges = append(userSync.LoginBridges[:index], userSync.LoginBridges[index+1:]...)
-					break
-				}
-			}
-		}
-	}()
 
 	wg.Wait()
 }
