@@ -169,6 +169,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/{platform}/list/devices": {
+            "post": {
+                "description": "Retrieves all active devices for the specified platform and user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Lists devices for a given platform",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Platform Name",
+                        "name": "platform",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Device List Request",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ClientBridgeJsonRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of devices",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid access token",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/{platform}/message/{contact}": {
             "post": {
                 "description": "Sends a message to a contact through the specified platform bridge",
@@ -257,22 +314,7 @@ const docTemplate = `{
             }
         },
         "main.ClientMessageJsonRequeset": {
-            "description": "Request payload to send a message to a room",
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string",
-                    "example": "syt_YWxwaGE..."
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Hello, world!"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "john_doe"
-                }
-            }
+            "type": "object"
         },
         "main.DeviceResponse": {
             "description": "Response payload for successful device addition. The websocket_url is used to establish a connection that: - Receives media/images from the platform bridge - Handles login synchronization events - Receives existing active sessions if available - Closes when receiving nil data (indicating end of session or error)",
