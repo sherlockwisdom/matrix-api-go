@@ -290,7 +290,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 	go func() {
 		for {
 			evt := <-ch
-			m.processIncomingEvents(evt)
+			go m.processIncomingEvents(evt)
 		}
 	}()
 
@@ -299,7 +299,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 		wg.Add(len(bridges))
 		for _, bridge := range bridges {
 			go func(bridge *Bridges) {
-				bridge.JoinMemberRooms()
+				bridge.CreateContactRooms()
 				log.Println("Joined member rooms for bridge:", bridge.Name)
 				// wg.Done()
 			}(bridge)
@@ -318,21 +318,35 @@ func (m *MatrixClient) syncClient(user Users) error {
 }
 
 func (m *MatrixClient) processIncomingEvents(evt *event.Event) error {
+	wg := sync.WaitGroup{}
+	wg.Add(len(EventSubscribers))
 	for _, subscriber := range EventSubscribers {
 		go func(subscriber EventSubscriber) {
+			if len(subscriber.ExcludeMsgTypes) > 0 {
+				for _, excludeMsgType := range subscriber.ExcludeMsgTypes {
+					if excludeMsgType == evt.Content.AsMessage().MsgType {
+						wg.Done()
+						return
+					}
+				}
+			}
+
 			if subscriber.MsgType == nil || *subscriber.MsgType == evt.Content.AsMessage().MsgType {
 				if subscriber.RoomID != "" && subscriber.RoomID != evt.RoomID {
+					wg.Done()
 					return
 				}
 
 				if subscriber.Since != nil && subscriber.Since.After(time.Unix(evt.Timestamp, 0)) {
+					wg.Done()
 					return
 				}
 
-				subscriber.Callback(evt)
+				go subscriber.Callback(evt, &wg)
 			}
 		}(subscriber)
 	}
+	wg.Wait()
 
 	return nil
 }

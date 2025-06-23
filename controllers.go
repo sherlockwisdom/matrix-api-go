@@ -14,11 +14,12 @@ import (
 var syncingUsers = make(map[string][]string)
 
 type EventSubscriber struct {
-	Name     string
-	MsgType  *event.MessageType
-	Callback func(event *event.Event)
-	Since    *time.Time
-	RoomID   id.RoomID
+	Name            string
+	MsgType         *event.MessageType
+	ExcludeMsgTypes []event.MessageType
+	Callback        func(event *event.Event, wg *sync.WaitGroup)
+	Since           *time.Time
+	RoomID          id.RoomID
 }
 
 var EventSubscribers = make([]EventSubscriber, 0)

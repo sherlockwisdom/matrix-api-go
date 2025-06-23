@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -45,8 +46,10 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 		eventSubscriber = EventSubscriber{
 			Name:    ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain),
 			MsgType: nil,
-			Callback: func(evt *event.Event) {
-				log.Println("Received bridge event:", evt.Content.AsMessage().Body, evt.RoomID, b.RoomID, evt.Sender, " -> ", b.Client.UserID)
+			Callback: func(evt *event.Event, wg *sync.WaitGroup) {
+				if wg != nil {
+					defer wg.Done()
+				}
 				if evt.RoomID == b.RoomID &&
 					evt.Sender != b.Client.UserID &&
 					evt.Timestamp >= since &&
@@ -227,7 +230,10 @@ func (b *Bridges) ListDevices() ([]string, error) {
 		MsgType: &eventType,
 		Since:   &eventSince,
 		RoomID:  b.RoomID,
-		Callback: func(event *event.Event) {
+		Callback: func(event *event.Event, wg *sync.WaitGroup) {
+			if wg != nil {
+				defer wg.Done()
+			}
 			devicesRaw := strings.Split(event.Content.AsMessage().Body, "\n")
 			devices := make([]string, 0)
 			for _, device := range devicesRaw {
@@ -275,15 +281,24 @@ func (b *Bridges) ListDevices() ([]string, error) {
 	return devices, nil
 }
 
-func (b *Bridges) JoinMemberRooms() error {
+func (b *Bridges) CreateContactRooms() error {
 	log.Println("Joining member rooms for:", b.Name)
 
-	devices, err := b.ListDevices()
-	log.Println("Devices:", devices)
+	devices := make([]string, 0)
+	_devices, err := b.ListDevices()
+	for _, device := range _devices {
+		formattedUsername, err := cfg.FormatUsername(b.Name, device)
+		if err != nil {
+			log.Println("Failed formatting username", err, device)
+			return err
+		}
+		devices = append(devices, formattedUsername)
+	}
 	if err != nil {
 		log.Println("Failed listing devices", err)
 		return err
 	}
+	log.Println("Devices:", devices)
 
 	clientDb := ClientDB{
 		username: b.Client.UserID.Localpart(),
@@ -293,22 +308,37 @@ func (b *Bridges) JoinMemberRooms() error {
 
 	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
 	eventSubName = eventSubName + "+join"
+
+	processedRooms := make(map[id.RoomID]bool)
+
 	eventSubscriber := EventSubscriber{
 		Name:    eventSubName,
 		MsgType: nil,
-		Callback: func(event *event.Event) {
-			log.Println("Received event:", event.RoomID)
+		ExcludeMsgTypes: []event.MessageType{
+			event.MsgNotice, event.MsgVerificationRequest, event.MsgLocation,
+		},
+		Callback: func(event *event.Event, wg *sync.WaitGroup) {
+			defer wg.Done()
+			// log.Println("Received event:", event.RoomID)
 			if event.RoomID != "" {
 				room := Rooms{
 					Client: b.Client,
 					ID:     event.RoomID,
 				}
 
+				if _, ok := processedRooms[event.RoomID]; ok {
+					return
+				}
+
+				processedRooms[event.RoomID] = true
+
 				isManagementRoom, err := room.IsManagementRoom(b.BotName)
 				if err != nil {
 					log.Println("Failed checking if room is management room", err)
 					return
 				}
+				log.Println("Is management room:", event.RoomID, isManagementRoom)
+				processedRooms[event.RoomID] = true
 
 				if !isManagementRoom {
 					members, err := room.GetRoomMembers(b.Client, event.RoomID)
@@ -317,31 +347,44 @@ func (b *Bridges) JoinMemberRooms() error {
 						return
 					}
 
-					for _, device := range devices {
-						formattedUsername, err := cfg.FormatUsername(b.Name, device)
+					foundDevice := false
+					foundMembers := make([]string, 0)
+					foundDeviceUserName := ""
+
+					for _, member := range members {
+						matched, err := cfg.CheckUsernameTemplate(b.Name, member.String())
 						if err != nil {
-							log.Println("Failed formatting username", err, device)
+							log.Println("Failed checking username template", err)
 							return
 						}
+						if !matched {
+							continue
+						}
 
-						for _, member := range members {
-							if member.String() == formattedUsername {
-								for _, _member := range members {
-									matched, err := cfg.CheckUsernameTemplate(b.Name, _member.String())
-									if err != nil {
-										log.Println("Failed checking username template", err)
-										return
-									}
-
-									// if isConversation, then it's a group
-									if matched {
-										clientDb.StoreRooms(event.RoomID.String(), b.Name, member.String(), false)
-										log.Println("Stored room:", event.RoomID.String(), b.Name, member.String(), false)
-									}
+						if !foundDevice {
+							for _, device := range devices {
+								if member.String() == device {
+									foundDevice = true
+									foundDeviceUserName = device
 								}
-
-								return
 							}
+							if !foundDevice {
+								foundMembers = append(foundMembers, member.String())
+							}
+						} else {
+							if foundDeviceUserName != member.String() {
+								foundMembers = append(foundMembers, member.String())
+							}
+						}
+					}
+
+					log.Printf("Is conversation: %v, found members: %v, found device: %v, found device user name: %v",
+						(foundDevice && len(foundMembers) > 0), foundMembers, foundDevice, foundDeviceUserName)
+
+					if foundDevice && len(foundMembers) > 0 {
+						for _, fMember := range foundMembers {
+							clientDb.StoreRooms(event.RoomID.String(), b.Name, fMember, false)
+							log.Println("Stored room:", event.RoomID.String(), b.Name, fMember, false)
 						}
 					}
 				}
