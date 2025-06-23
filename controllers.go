@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -123,50 +124,54 @@ func (c *Controller) SendMessage(username, message, contact, platform, deviceNam
 
 	log.Println("Fetching rooms for", formattedUsername, rooms, "using device:", deviceName)
 
-	// for _, room := range rooms {
-	// 	if fileData != nil {
-	// 		// Send PDF file
-	// 		uploadResp, err := c.Client.UploadBytesWithName(
-	// 			context.Background(),
-	// 			fileData,
-	// 			"application/pdf",
-	// 			"shortmesh.pdf",
-	// 		)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		fileMsg := &event.MessageEventContent{
-	// 			MsgType: event.MsgFile,
-	// 			Body:    "body",
-	// 			URL:     id.ContentURIString(uploadResp.ContentURI.String()),
-	// 			Info: &event.FileInfo{
-	// 				MimeType: "application/pdf",
-	// 				Size:     len(fileData),
-	// 			},
-	// 			FileName: "shortmesh.pdf",
-	// 		}
-	// 		resp, err := c.Client.SendMessageEvent(
-	// 			context.Background(),
-	// 			room.ID,
-	// 			event.EventMessage,
-	// 			fileMsg,
-	// 		)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		log.Println("Sent PDF to", room.ID, resp.EventID)
-	// 	} else {
-	// 		resp, err := c.Client.SendText(
-	// 			context.Background(),
-	// 			room.ID,
-	// 			message,
-	// 		)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		log.Println("Sent message to", room.ID, resp.EventID)
-	// 	}
-	// }
+	if len(rooms) > 1 {
+		log.Println("Multiple rooms found for", formattedUsername, rooms)
+		return fmt.Errorf("multiple rooms found for: %s", formattedUsername)
+	}
+
+	room := rooms[0]
+	if fileData != nil {
+		// Send PDF file
+		uploadResp, err := c.Client.UploadBytesWithName(
+			context.Background(),
+			fileData,
+			"application/pdf",
+			"shortmesh.pdf",
+		)
+		if err != nil {
+			return err
+		}
+		fileMsg := &event.MessageEventContent{
+			MsgType: event.MsgFile,
+			Body:    "body",
+			URL:     id.ContentURIString(uploadResp.ContentURI.String()),
+			Info: &event.FileInfo{
+				MimeType: "application/pdf",
+				Size:     len(fileData),
+			},
+			FileName: "shortmesh.pdf",
+		}
+		resp, err := c.Client.SendMessageEvent(
+			context.Background(),
+			room.ID,
+			event.EventMessage,
+			fileMsg,
+		)
+		if err != nil {
+			return err
+		}
+		log.Println("Sent PDF to", room.ID, resp.EventID)
+	} else {
+		resp, err := c.Client.SendText(
+			context.Background(),
+			room.ID,
+			message,
+		)
+		if err != nil {
+			return err
+		}
+		log.Println("Sent message to", room.ID, resp.EventID)
+	}
 
 	return nil
 }
