@@ -267,25 +267,6 @@ func (m *MatrixClient) syncClient(user Users) error {
 	clientDb.Init()
 	bridges, err := clientDb.FetchBridgeRooms(user.Username)
 
-	// insert bridge names into syncingUsers if not already present
-	for _, bridge := range bridges {
-		bridge.Client = client
-		if _, ok := syncingUsers[user.Username]; !ok {
-			syncingUsers[user.Username] = []string{}
-		}
-		syncingUsers[user.Username] = append(syncingUsers[user.Username], bridge.Name)
-	}
-
-	if len(bridges) == 0 {
-		log.Println("No bridges found for user:", user.Username)
-		return nil
-	}
-
-	if err != nil {
-		log.Println("Error fetching bridge rooms for user:", err, user.Username)
-		return err
-	}
-
 	ch := make(chan *event.Event)
 	go func() {
 		for {
@@ -294,9 +275,34 @@ func (m *MatrixClient) syncClient(user Users) error {
 		}
 	}()
 
+	// insert bridge names into syncingUsers if not already present
 	go func() {
-		wg := sync.WaitGroup{}
-		wg.Add(len(bridges))
+		for _, bridge := range bridges {
+			bridge.Client = client
+			if _, ok := syncingUsers[user.Username]; !ok {
+				syncingUsers[user.Username] = []string{}
+			}
+			syncingUsers[user.Username] = append(syncingUsers[user.Username], bridge.Name)
+			if _, ok := ClientDevices[user.Username]; !ok {
+				ClientDevices[user.Username] = make(map[string][]string)
+			} else if _, ok := ClientDevices[user.Username][bridge.Name]; !ok {
+				ClientDevices[user.Username][bridge.Name] = make([]string, 0)
+			}
+
+			devices, err := bridge.ListDevices()
+			log.Println("Devices for bridge:", bridge.Name, devices)
+
+			if err != nil {
+				log.Println("Error listing devices for user:", err, user.Username)
+				continue
+			}
+			ClientDevices[user.Username][bridge.Name] = devices
+		}
+
+		if len(bridges) == 0 {
+			log.Println("No bridges found for user:", user.Username)
+			return
+		}
 		for _, bridge := range bridges {
 			go func(bridge *Bridges) {
 				bridge.CreateContactRooms()
@@ -304,7 +310,6 @@ func (m *MatrixClient) syncClient(user Users) error {
 				// wg.Done()
 			}(bridge)
 		}
-		wg.Wait()
 	}()
 
 	err = mc.Sync(ch)
@@ -318,35 +323,28 @@ func (m *MatrixClient) syncClient(user Users) error {
 }
 
 func (m *MatrixClient) processIncomingEvents(evt *event.Event) error {
-	wg := sync.WaitGroup{}
-	wg.Add(len(EventSubscribers))
 	for _, subscriber := range EventSubscribers {
-		go func(subscriber EventSubscriber) {
-			if len(subscriber.ExcludeMsgTypes) > 0 {
-				for _, excludeMsgType := range subscriber.ExcludeMsgTypes {
-					if excludeMsgType == evt.Content.AsMessage().MsgType {
-						wg.Done()
-						return
-					}
+		if len(subscriber.ExcludeMsgTypes) > 0 {
+			for _, excludeMsgType := range subscriber.ExcludeMsgTypes {
+				if excludeMsgType == evt.Content.AsMessage().MsgType {
+					continue
 				}
 			}
+		}
 
-			if subscriber.MsgType == nil || *subscriber.MsgType == evt.Content.AsMessage().MsgType {
-				if subscriber.RoomID != "" && subscriber.RoomID != evt.RoomID {
-					wg.Done()
-					return
-				}
-
-				if subscriber.Since != nil && subscriber.Since.After(time.Unix(evt.Timestamp, 0)) {
-					wg.Done()
-					return
-				}
-
-				go subscriber.Callback(evt, &wg)
+		if subscriber.MsgType == nil || *subscriber.MsgType == evt.Content.AsMessage().MsgType {
+			if subscriber.RoomID != "" && subscriber.RoomID != evt.RoomID {
+				continue
 			}
-		}(subscriber)
+
+			if subscriber.Since != nil && subscriber.Since.After(time.Unix(evt.Timestamp, 0)) {
+				continue
+			}
+
+			subscriber.Callback(evt)
+		}
+
 	}
-	wg.Wait()
 
 	return nil
 }

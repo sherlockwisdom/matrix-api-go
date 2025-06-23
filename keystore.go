@@ -25,7 +25,7 @@ func (ks *Keystore) Init() {
 	_, err = db.Exec(`
 	CREATE TABLE IF NOT EXISTS users ( 
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		username TEXT NOT NULL, 
+		username TEXT NOT NULL UNIQUE, 
 		accessToken TEXT NOT NULL,
 		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -42,7 +42,7 @@ func (ks *Keystore) CreateUser(username string, accessToken string) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO users (username, accessToken) values(?,?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO users (username, accessToken) values(?,?)`)
 	if err != nil {
 		return err
 	}
@@ -135,24 +135,15 @@ func (clientDb *ClientDB) Init() error {
 	id INTEGER PRIMARY KEY AUTOINCREMENT, 
 	clientUsername TEXT NOT NULL,
 	roomID TEXT NOT NULL,
-	name TEXT NOT NULL,
+	platformName TEXT NOT NULL,
 	members TEXT NOT NULL,
+	deviceName TEXT,
 	isBridge INTEGER NOT NULL,
 	sessions BLOB,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	sessionsTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
-	UNIQUE(clientUsername, roomID, name, isBridge)
+	UNIQUE(clientUsername, roomID, platformName, isBridge)
 	);
-
-	CREATE TABLE IF NOT EXISTS devices ( 
-	id INTEGER PRIMARY KEY AUTOINCREMENT, 
-	clientUsername TEXT NOT NULL, 
-	deviceName TEXT NOT NULL, 
-	deviceID TEXT NOT NULL, 
-	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
-	UNIQUE(clientUsername, deviceName, deviceID)
-	);
-
 	`)
 
 	if err != nil {
@@ -258,6 +249,7 @@ func (clientDb *ClientDB) Close() {
 func (clientDb *ClientDB) StoreRooms(
 	roomID string,
 	platformName string,
+	deviceName string,
 	members string,
 	isBridge bool,
 ) error {
@@ -267,7 +259,7 @@ func (clientDb *ClientDB) StoreRooms(
 	}
 
 	stmt, err := tx.Prepare(
-		`INSERT OR REPLACE INTO rooms (clientUsername, roomID, name, members, isBridge) values(?,?,?,?,?)`,
+		`INSERT OR REPLACE INTO rooms (clientUsername, roomID, platformName, deviceName, members, isBridge) values(?,?,?,?,?,?)`,
 	)
 	if err != nil {
 		return err
@@ -275,7 +267,7 @@ func (clientDb *ClientDB) StoreRooms(
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(clientDb.username, roomID, platformName, members, isBridge)
+	_, err = stmt.Exec(clientDb.username, roomID, platformName, deviceName, members, isBridge)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to store room: %w", err)
@@ -291,21 +283,21 @@ func (clientDb *ClientDB) StoreRooms(
 
 func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, type, isBridge from rooms where roomID = ?",
+		"select clientUsername, roomID, platformName, deviceName, members, isBridge from rooms where roomID = ?",
 	)
 	if err != nil {
 		return Rooms{}, err
 	}
 	var clientUsername string
 	var _roomID string
-	var name string
+	var platformName string
+	var deviceName string
 	var members string
-	var _type int
 	var isBridge bool
 
 	defer stmt.Close()
 
-	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &name, &members, &_type, &isBridge)
+	err = stmt.QueryRow(roomID).Scan(&clientUsername, &_roomID, &platformName, &deviceName, &members, &isBridge)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Rooms{}, nil
@@ -314,10 +306,11 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 	}
 
 	var room = Rooms{
-		ID:       id.RoomID(_roomID),
-		isBridge: isBridge,
+		ID:         id.RoomID(_roomID),
+		isBridge:   isBridge,
+		DeviceName: deviceName,
 		Members: map[string]string{
-			name: members,
+			platformName: members,
 		},
 	}
 
@@ -327,7 +320,7 @@ func (clientDb *ClientDB) FetchRooms(roomID string) (Rooms, error) {
 func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
 	log.Println("Fetching room members for", members, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, isBridge from rooms where members = ?",
+		"select clientUsername, roomID, platformName, deviceName, members, isBridge from rooms where members = ?",
 	)
 	if err != nil {
 		return nil, err
@@ -344,20 +337,22 @@ func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
 	for rows.Next() {
 		var clientUsername string
 		var _roomID string
-		var _name string
+		var _platformName string
+		var _deviceName string
 		var _members string
 		var isBridge bool
 
-		err = rows.Scan(&clientUsername, &_roomID, &_name, &_members, &isBridge)
+		err = rows.Scan(&clientUsername, &_roomID, &_platformName, &_deviceName, &_members, &isBridge)
 		if err != nil {
 			return nil, err
 		}
 
 		room := Rooms{
-			ID:       id.RoomID(_roomID),
-			isBridge: isBridge,
+			ID:         id.RoomID(_roomID),
+			isBridge:   isBridge,
+			DeviceName: _deviceName,
 			Members: map[string]string{
-				_name: _members,
+				_platformName: _members,
 			},
 		}
 		rooms = append(rooms, room)
@@ -371,9 +366,9 @@ func (clientDb *ClientDB) FetchRoomsByMembers(members string) ([]Rooms, error) {
 }
 
 func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) {
-	log.Println("Fetching bridge rooms for", username, clientDb.filepath)
+	// log.Println("Fetching bridge rooms for", username, clientDb.filepath)
 	stmt, err := clientDb.connection.Prepare(
-		"select clientUsername, roomID, name, members, isBridge from rooms where clientUsername = ? and isBridge = 1",
+		"select clientUsername, roomID, platformName, deviceName, members, isBridge from rooms where clientUsername = ? and isBridge = 1",
 	)
 	if err != nil {
 		return []*Bridges{}, err
@@ -392,19 +387,21 @@ func (clientDb *ClientDB) FetchBridgeRooms(username string) ([]*Bridges, error) 
 	for rows.Next() {
 		var clientUsername string
 		var _roomID string
-		var name string
+		var platformName string
+		var deviceName string
 		var members string
 		var isBridge bool
 
-		err = rows.Scan(&clientUsername, &_roomID, &name, &members, &isBridge)
+		err = rows.Scan(&clientUsername, &_roomID, &platformName, &deviceName, &members, &isBridge)
 		if err != nil {
 			return []*Bridges{}, err
 		}
 
 		bridges = append(bridges, &Bridges{
-			RoomID:  id.RoomID(_roomID),
-			Name:    name,
-			BotName: members,
+			RoomID:     id.RoomID(_roomID),
+			Name:       platformName,
+			DeviceName: deviceName,
+			BotName:    members,
 		})
 	}
 
@@ -433,14 +430,14 @@ func (clientDb *ClientDB) StoreActiveSessions(username string, sessions []byte) 
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT OR REPLACE INTO rooms (clientUsername, sessions, sessionsTimestamp) VALUES (?, ?, CURRENT_TIMESTAMP)")
+	stmt, err := tx.Prepare("UPDATE rooms SET sessions = ?, sessionsTimestamp = CURRENT_TIMESTAMP WHERE clientUsername = ? AND isBridge = 1")
 	if err != nil {
 		return err
 	}
 
 	defer stmt.Close()
 
-	_, err = stmt.Exec(username, sessions)
+	_, err = stmt.Exec(sessions, username)
 	if err != nil {
 		return err
 	}
@@ -491,57 +488,4 @@ func IsActiveSessionsExpired(clientDb *ClientDB, username string) bool {
 
 	now := time.Now()
 	return now.After(sessionsTimestamp.Add(16 * time.Second))
-}
-
-func (clientDb *ClientDB) StoreDevices(username string, deviceName string, deviceID string) error {
-	tx, err := clientDb.connection.Begin()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := tx.Prepare("insert into devices (clientUsername, deviceName, deviceID) values(?,?,?)")
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
-	_, err = stmt.Exec(username, deviceName, deviceID)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (clientDb *ClientDB) FetchDevices(username string) ([]string, error) {
-	stmt, err := clientDb.connection.Prepare("select deviceName, deviceID from devices where clientUsername = ?")
-	if err != nil {
-		return []string{}, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(username)
-	if err != nil {
-		return []string{}, err
-	}
-	defer rows.Close()
-
-	var devices []string
-	for rows.Next() {
-		var deviceName string
-		var deviceID string
-		err = rows.Scan(&deviceName, &deviceID)
-		if err != nil {
-			return []string{}, err
-		}
-		devices = append(devices, deviceName)
-	}
-
-	return devices, nil
 }

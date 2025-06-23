@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -14,10 +13,11 @@ import (
 )
 
 type Bridges struct {
-	Name    string
-	BotName string
-	RoomID  id.RoomID
-	Client  *mautrix.Client
+	Name       string
+	BotName    string
+	DeviceName string
+	RoomID     id.RoomID
+	Client     *mautrix.Client
 }
 
 func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan []byte) {
@@ -43,13 +43,11 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 	}
 
 	if eventSubscriber.Name == "" {
+		eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) + "+login"
 		eventSubscriber = EventSubscriber{
-			Name:    ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain),
+			Name:    eventSubName,
 			MsgType: nil,
-			Callback: func(evt *event.Event, wg *sync.WaitGroup) {
-				if wg != nil {
-					defer wg.Done()
-				}
+			Callback: func(evt *event.Event) {
 				if evt.RoomID == b.RoomID &&
 					evt.Sender != b.Client.UserID &&
 					evt.Timestamp >= since &&
@@ -85,6 +83,15 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 						log.Println("New message adding device:", evt.Content.AsMessage().FileName)
 					}
 				}
+
+				defer func() {
+					for index, subscriber := range EventSubscribers {
+						if subscriber.Name == eventSubName {
+							EventSubscribers = append(EventSubscribers[:index], EventSubscribers[index+1:]...)
+							break
+						}
+					}
+				}()
 			},
 		}
 		EventSubscribers = append(EventSubscribers, eventSubscriber)
@@ -214,13 +221,14 @@ func (b *Bridges) JoinRooms() error {
 		b.RoomID = resp.RoomID
 	}
 
-	clientDb.StoreRooms(b.RoomID.String(), b.Name, b.BotName, true)
+	clientDb.StoreRooms(b.RoomID.String(), b.Name, "", b.BotName, true)
 	log.Println("[+] Stored room successfully for:", b.BotName, b.RoomID)
 
 	return nil
 }
 
 func (b *Bridges) ListDevices() ([]string, error) {
+	log.Println("Listing devices for:", b.Name, b.RoomID)
 	ch := make(chan []string)
 	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
 	eventType := event.MsgNotice
@@ -230,10 +238,7 @@ func (b *Bridges) ListDevices() ([]string, error) {
 		MsgType: &eventType,
 		Since:   &eventSince,
 		RoomID:  b.RoomID,
-		Callback: func(event *event.Event, wg *sync.WaitGroup) {
-			if wg != nil {
-				defer wg.Done()
-			}
+		Callback: func(event *event.Event) {
 			devicesRaw := strings.Split(event.Content.AsMessage().Body, "\n")
 			devices := make([]string, 0)
 			for _, device := range devicesRaw {
@@ -250,7 +255,6 @@ func (b *Bridges) ListDevices() ([]string, error) {
 				for index, subscriber := range EventSubscribers {
 					if subscriber.Name == eventSubName {
 						EventSubscribers = append(EventSubscribers[:index], EventSubscribers[index+1:]...)
-						log.Println("Removed event subscriber:", eventSubName)
 						break
 					}
 				}
@@ -284,22 +288,6 @@ func (b *Bridges) ListDevices() ([]string, error) {
 func (b *Bridges) CreateContactRooms() error {
 	log.Println("Joining member rooms for:", b.Name)
 
-	devices := make([]string, 0)
-	_devices, err := b.ListDevices()
-	for _, device := range _devices {
-		formattedUsername, err := cfg.FormatUsername(b.Name, device)
-		if err != nil {
-			log.Println("Failed formatting username", err, device)
-			return err
-		}
-		devices = append(devices, formattedUsername)
-	}
-	if err != nil {
-		log.Println("Failed listing devices", err)
-		return err
-	}
-	log.Println("Devices:", devices)
-
 	clientDb := ClientDB{
 		username: b.Client.UserID.Localpart(),
 		filepath: "db/" + b.Client.UserID.Localpart() + ".db",
@@ -317,9 +305,8 @@ func (b *Bridges) CreateContactRooms() error {
 		ExcludeMsgTypes: []event.MessageType{
 			event.MsgNotice, event.MsgVerificationRequest, event.MsgLocation,
 		},
-		Callback: func(event *event.Event, wg *sync.WaitGroup) {
-			defer wg.Done()
-			// log.Println("Received event:", event.RoomID)
+		Callback: func(event *event.Event) {
+			// log.Println("Received event:", event.RoomID, event.Content.AsMessage().Body)
 			if event.RoomID != "" {
 				room := Rooms{
 					Client: b.Client,
@@ -352,6 +339,7 @@ func (b *Bridges) CreateContactRooms() error {
 					foundDeviceUserName := ""
 
 					for _, member := range members {
+						log.Println("Checking member:", member.String())
 						matched, err := cfg.CheckUsernameTemplate(b.Name, member.String())
 						if err != nil {
 							log.Println("Failed checking username template", err)
@@ -361,30 +349,35 @@ func (b *Bridges) CreateContactRooms() error {
 							continue
 						}
 
-						if !foundDevice {
-							for _, device := range devices {
-								if member.String() == device {
-									foundDevice = true
-									foundDeviceUserName = device
-								}
+						devices := ClientDevices[b.Client.UserID.Localpart()][b.Name]
+						log.Println("Devices:", devices)
+
+						for _, device := range devices {
+							formattedUsername, err := cfg.FormatUsername(b.Name, device)
+							if err != nil {
+								log.Println("Failed formatting username", err, device)
+								continue
 							}
-							if !foundDevice {
-								foundMembers = append(foundMembers, member.String())
-							}
-						} else {
-							if foundDeviceUserName != member.String() {
+							if member.String() == formattedUsername {
+								foundDevice = true
+								foundDeviceUserName = formattedUsername
+								log.Println("Found device:", foundDeviceUserName)
+								break
+							} else {
 								foundMembers = append(foundMembers, member.String())
 							}
 						}
 					}
 
-					log.Printf("Is conversation: %v, found members: %v, found device: %v, found device user name: %v",
-						(foundDevice && len(foundMembers) > 0), foundMembers, foundDevice, foundDeviceUserName)
+					if foundDevice && len(foundMembers) == 0 {
+						log.Println("Found device but no members, adding device to members", foundDeviceUserName)
+						foundMembers = append(foundMembers, foundDeviceUserName)
+					}
 
 					if foundDevice && len(foundMembers) > 0 {
 						for _, fMember := range foundMembers {
-							clientDb.StoreRooms(event.RoomID.String(), b.Name, fMember, false)
-							log.Println("Stored room:", event.RoomID.String(), b.Name, fMember, false)
+							clientDb.StoreRooms(event.RoomID.String(), b.Name, foundDeviceUserName, fMember, false)
+							// log.Println("Stored room:", event.RoomID.String(), b.Name, fMember, false, foundDeviceUserName)
 						}
 					}
 				}

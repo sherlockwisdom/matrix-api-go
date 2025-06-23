@@ -56,6 +56,7 @@ type ClientMessageJsonRequeset struct {
 	Username    string `json:"username" example:"john_doe"`
 	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
 	Message     string `json:"message" example:"Hello, world!"`
+	DeviceName  string `json:"device_name" example:"237123456789"`
 	FileData    []byte `json:"file_data" example:"[file_data]"`
 }
 
@@ -170,6 +171,19 @@ func sanitizeContact(contact string) (string, error) {
 	}
 
 	return contact, nil
+}
+
+func sanitizeDeviceName(deviceName string) (string, error) {
+	// Remove any whitespace
+	deviceName = strings.TrimSpace(deviceName)
+
+	// Device name should be 2-20 characters and contain only letters and numbers
+	validDeviceName := regexp.MustCompile(`^[a-z0-9]{2,20}$`)
+	if !validDeviceName.MatchString(deviceName) {
+		return "", fmt.Errorf("device name must be 2-20 characters and contain only letters and numbers")
+	}
+
+	return deviceName, nil
 }
 
 // ApiLogin godoc
@@ -309,7 +323,7 @@ func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
 
 	// Sanitize platform and contact parameters
-	_, err := sanitizePlatform(c.Param("platform"))
+	platform, err := sanitizePlatform(c.Param("platform"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -340,6 +354,10 @@ func ApiSendMessage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Message is required"})
 		return
 	}
+	if req.DeviceName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Device name is required"})
+		return
+	}
 
 	// Sanitize username
 	username, err := sanitizeUsername(req.Username)
@@ -350,6 +368,13 @@ func ApiSendMessage(c *gin.Context) {
 
 	// Sanitize message
 	message, err := sanitizeMessage(req.Message)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Sanitize device name
+	deviceName, err := sanitizeDeviceName(req.DeviceName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -380,7 +405,7 @@ func ApiSendMessage(c *gin.Context) {
 		UserID: client.UserID,
 	}
 
-	err = controller.SendMessage(username, message, contactID, c.Param("platform"), req.FileData)
+	err = controller.SendMessage(username, message, contactID, platform, deviceName, req.FileData)
 
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
@@ -473,6 +498,18 @@ func ApiAddDevice(c *gin.Context) {
 	})
 }
 
+// ApiListDevices godoc
+// @Summary Lists devices for a given platform
+// @Description Retrieves all active devices for the specified platform and user
+// @Accept  json
+// @Produce  json
+// @Param   platform path string true "Platform Name" example:"wa"
+// @Param   payload body ClientBridgeJsonRequest true "Device List Request"
+// @Success 200 {object} map[string]interface{} "List of devices"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Invalid access token"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{platform}/list/devices [post]
 func ApiListDevices(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
 

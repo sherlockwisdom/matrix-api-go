@@ -12,12 +12,13 @@ import (
 )
 
 var syncingUsers = make(map[string][]string)
+var ClientDevices = make(map[string]map[string][]string)
 
 type EventSubscriber struct {
 	Name            string
 	MsgType         *event.MessageType
 	ExcludeMsgTypes []event.MessageType
-	Callback        func(event *event.Event, wg *sync.WaitGroup)
+	Callback        func(event *event.Event)
 	Since           *time.Time
 	RoomID          id.RoomID
 }
@@ -102,7 +103,7 @@ func (c *Controller) LoginProcess(password string) error {
 	return nil
 }
 
-func (c *Controller) SendMessage(username, message, contact, platform string, fileData []byte) error {
+func (c *Controller) SendMessage(username, message, contact, platform, deviceName string, fileData []byte) error {
 	formattedUsername, err := cfg.FormatUsername(platform, contact)
 	if err != nil {
 		return err
@@ -120,7 +121,7 @@ func (c *Controller) SendMessage(username, message, contact, platform string, fi
 		return err
 	}
 
-	log.Println("Fetching rooms for", formattedUsername, rooms)
+	log.Println("Fetching rooms for", formattedUsername, rooms, "using device:", deviceName)
 
 	// for _, room := range rooms {
 	// 	if fileData != nil {
@@ -171,38 +172,39 @@ func (c *Controller) SendMessage(username, message, contact, platform string, fi
 }
 
 func (c *Controller) ListDevices(username, platform string) ([]string, error) {
-	bridge := &Bridges{
-		Name:   platform,
-		Client: c.Client,
-	}
+	// bridge := &Bridges{
+	// 	Name:   platform,
+	// 	Client: c.Client,
+	// }
 
-	clientDb := ClientDB{
-		username: username,
-		filepath: "db/" + username + ".db",
-	}
-	clientDb.Init()
-	bridges, err := clientDb.FetchBridgeRooms(username)
-	if err != nil {
-		return nil, err
-	}
+	// clientDb := ClientDB{
+	// 	username: username,
+	// 	filepath: "db/" + username + ".db",
+	// }
+	// clientDb.Init()
+	// bridges, err := clientDb.FetchBridgeRooms(username)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	for _, _bridge := range bridges {
-		if _bridge.Name == platform {
-			bridge.RoomID = _bridge.RoomID
-			break
-		}
-	}
+	// for _, _bridge := range bridges {
+	// 	if _bridge.Name == platform {
+	// 		bridge.RoomID = _bridge.RoomID
+	// 		break
+	// 	}
+	// }
 
-	if bridge.RoomID == "" {
-		return nil, fmt.Errorf("bridge room not found for: %s", platform)
-	}
+	// if bridge.RoomID == "" {
+	// 	return nil, fmt.Errorf("bridge room not found for: %s", platform)
+	// }
 
-	log.Println("Listing devices for", username, platform, bridge.RoomID)
+	// log.Println("Listing devices for", username, platform, bridge.RoomID)
 
-	devices, err := bridge.ListDevices()
-	if err != nil {
-		return nil, err
-	}
+	// devices, err := bridge.ListDevices()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	devices := ClientDevices[username][platform]
 
 	return devices, nil
 }

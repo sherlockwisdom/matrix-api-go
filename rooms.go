@@ -9,10 +9,11 @@ import (
 )
 
 type Rooms struct {
-	Client   *mautrix.Client
-	ID       id.RoomID
-	isBridge bool
-	Members  map[string]string
+	Client     *mautrix.Client
+	ID         id.RoomID
+	isBridge   bool
+	DeviceName string
+	Members    map[string]string
 }
 
 func (r *Rooms) IsBridgeInviteForContact(evt *event.Event) (bool, error) {
