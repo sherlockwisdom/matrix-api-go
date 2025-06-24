@@ -300,6 +300,15 @@ func (m *MatrixClient) syncClient(user Users) error {
 			ClientDevices[user.Username][bridge.Name] = devices
 
 			go func(bridge *Bridges) {
+				bridgeCfg, ok := cfg.GetBridgeConfig(bridge.Name)
+				if !ok {
+					log.Println("Bridge config not found for:", bridge.Name)
+					return
+				}
+				bridge.ProcessIncomingLoginDaemon(bridgeCfg)
+			}(bridge)
+
+			go func(bridge *Bridges) {
 				bridge.CreateContactRooms()
 				log.Println("Joined member rooms for bridge:", bridge.Name)
 				// wg.Done()

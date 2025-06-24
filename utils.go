@@ -114,6 +114,25 @@ func (c *Conf) CheckSuccessPattern(bridgeType string, input string) (bool, error
 	return matched, nil
 }
 
+func (c *Conf) CheckOngoingPattern(bridgeType string, input string) (bool, error) {
+	config, ok := c.GetBridgeConfig(bridgeType)
+	if !ok {
+		return false, fmt.Errorf("bridge type %s not found in configuration", bridgeType)
+	}
+
+	ongoingPattern, ok := config.Cmd["ongoing"]
+	if !ok {
+		return false, fmt.Errorf("ongoing pattern not found for bridge type %s", bridgeType)
+	}
+
+	matched, err := regexp.MatchString(ongoingPattern, input)
+	if err != nil {
+		return false, fmt.Errorf("error matching pattern: %v", err)
+	}
+
+	return matched, nil
+}
+
 func (c *Conf) CheckUsernameTemplate(bridgeType string, username string) (bool, error) {
 	config, ok := c.GetBridgeConfig(bridgeType)
 	if !ok {

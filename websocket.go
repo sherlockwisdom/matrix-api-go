@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -54,27 +53,27 @@ func GetWebsocketIndex(username string, platformName string) int {
 	return -1
 }
 
-func (ws *Websockets) listenForDisconnection(c *websocket.Conn, ch chan []byte) {
-	for {
-		_, _, err := c.ReadMessage()
-		if err != nil {
-			log.Printf("Client connection lost for user %s: %v", ws.Bridge.Client.UserID, err)
-			if bridgeCfg, ok := cfg.GetBridgeConfig(ws.Bridge.Name); ok {
-				log.Println("Sending cancel command to:", ws.Bridge.RoomID)
-				_, err = ws.Bridge.Client.SendText(
-					context.Background(),
-					ws.Bridge.RoomID,
-					bridgeCfg.Cmd["cancel"],
-				)
+// func (ws *Websockets) listenForDisconnection(c *websocket.Conn, ch chan []byte) {
+// 	for {
+// 		_, _, err := c.ReadMessage()
+// 		if err != nil {
+// 			log.Printf("Client connection lost for user %s: %v", ws.Bridge.Client.UserID, err)
+// 			if bridgeCfg, ok := cfg.GetBridgeConfig(ws.Bridge.Name); ok {
+// 				log.Println("Sending cancel command to:", ws.Bridge.RoomID)
+// 				_, err = ws.Bridge.Client.SendText(
+// 					context.Background(),
+// 					ws.Bridge.RoomID,
+// 					bridgeCfg.Cmd["cancel"],
+// 				)
 
-				if err != nil {
-					log.Printf("Error sending cancel command to %s: %v", ws.Bridge.RoomID, err)
-				}
-				ch <- nil
-			}
-		}
-	}
-}
+// 				if err != nil {
+// 					log.Printf("Error sending cancel command to %s: %v", ws.Bridge.RoomID, err)
+// 				}
+// 				ch <- nil
+// 			}
+// 		}
+// 	}
+// }
 
 func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Websocket handler called", ws.Bridge.Client.UserID)
@@ -85,7 +84,7 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ch := make(chan []byte)
-	go ws.listenForDisconnection(conn, ch)
+	// go ws.listenForDisconnection(conn, ch)
 
 	clientDb := ClientDB{
 		username: ws.Bridge.Client.UserID.Localpart(),
@@ -95,22 +94,17 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error initializing client db:", err)
 	}
 
-	// if IsActiveSessionsExpired(&clientDb, ws.Bridge.Client.UserID.Localpart()) {
-	// 	log.Println("Active sessions expired, removing active sessions")
-	// 	clientDb.RemoveActiveSessions(ws.Bridge.Client.UserID.Localpart())
-	// } else {
-	// 	sessions, _, err := clientDb.FetchActiveSessions(ws.Bridge.Client.UserID.Localpart())
-	// 	if err != nil {
-	// 		log.Println("Error fetching active sessions:", err)
-	// 	}
+	sessions, _, err := clientDb.FetchActiveSessions(ws.Bridge.Client.UserID.Localpart())
+	if err != nil {
+		log.Println("Error fetching active sessions:", err)
+	}
 
-	// 	if len(sessions) > 0 {
-	// 		log.Println("Active sessions found, sending message to client socket")
-	// 	}
-	// 	conn.WriteMessage(websocket.BinaryMessage, sessions)
-	// }
+	if len(sessions) > 0 {
+		log.Println("Active sessions found, sending message to client socket")
+		conn.WriteMessage(websocket.BinaryMessage, sessions)
+	}
 
-	err = ws.Bridge.AddDevice(ch)
+	err = ws.Bridge.AddDevice(&ch)
 	if err != nil {
 		log.Printf("Failed to add device: %v", err)
 		return
