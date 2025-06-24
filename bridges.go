@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -20,8 +21,8 @@ type Bridges struct {
 	Client     *mautrix.Client
 }
 
-func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan []byte) {
-	since := time.Now().UTC()
+func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan []byte, wg *sync.WaitGroup) {
+	since := time.Now().UTC().Add(-2 * time.Minute)
 
 	var clientDb = ClientDB{
 		username: b.Client.UserID.Localpart(),
@@ -37,13 +38,11 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 	eventSubscriber := EventSubscriber{}
 	for _, subscriber := range EventSubscribers {
 		if subscriber.Name == eventSubName && subscriber.MsgType == nil {
-			log.Println("Found event subscriber for:", eventSubName)
 			eventSubscriber = subscriber
 		}
 	}
 
 	if eventSubscriber.Name == "" {
-		log.Println("No event subscriber found for:", eventSubName)
 		eventSubscriber = EventSubscriber{
 			Name:    eventSubName,
 			MsgType: nil,
@@ -97,6 +96,7 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 		}
 		EventSubscribers = append(EventSubscribers, eventSubscriber)
 	}
+	wg.Done()
 }
 
 func (b *Bridges) startNewSession(cmd string) error {
@@ -153,7 +153,11 @@ func (b *Bridges) AddDevice(ch chan []byte) error {
 		return fmt.Errorf("login command not found for: %s", b.Name)
 	}
 
-	go b.processIncomingLoginMessages(bridgeCfg, ch)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go b.processIncomingLoginMessages(bridgeCfg, ch, &wg)
+
+	wg.Wait()
 
 	activeSessions, err := b.checkActiveSessions()
 	if err != nil {

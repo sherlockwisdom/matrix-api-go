@@ -298,13 +298,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 				continue
 			}
 			ClientDevices[user.Username][bridge.Name] = devices
-		}
 
-		if len(bridges) == 0 {
-			log.Println("No bridges found for user:", user.Username)
-			return
-		}
-		for _, bridge := range bridges {
 			go func(bridge *Bridges) {
 				bridge.CreateContactRooms()
 				log.Println("Joined member rooms for bridge:", bridge.Name)
