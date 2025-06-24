@@ -305,30 +305,43 @@ func (b *Bridges) CreateContactRooms() error {
 		ExcludeMsgTypes: []event.MessageType{
 			event.MsgNotice, event.MsgVerificationRequest, event.MsgLocation,
 		},
-		Callback: func(event *event.Event) {
+		Callback: func(evt *event.Event) {
 			// log.Println("Received event:", event.RoomID, event.Content.AsMessage().Body)
-			if event.RoomID != "" {
+			if evt.RoomID != "" {
 				room := Rooms{
 					Client: b.Client,
-					ID:     event.RoomID,
+					ID:     evt.RoomID,
 				}
 
-				if _, ok := processedRooms[event.RoomID]; ok {
+				if _, ok := processedRooms[evt.RoomID]; ok {
 					return
 				}
 
-				processedRooms[event.RoomID] = true
+				processedRooms[evt.RoomID] = true
+
+				powerLevels, err := room.GetPowerLevelsUser()
+				if err != nil {
+					log.Println("Failed getting power levels", err)
+					return
+				}
+				log.Println("Power levels:", powerLevels)
+				powerLevelsEvents, err := room.GetPowerLevelsEvents()
+				if err != nil {
+					log.Println("Failed getting power levels events", err)
+					return
+				}
+				log.Println("Power levels events:", powerLevelsEvents)
 
 				isManagementRoom, err := room.IsManagementRoom(b.BotName)
 				if err != nil {
 					log.Println("Failed checking if room is management room", err)
 					return
 				}
-				log.Println("Is management room:", event.RoomID, isManagementRoom)
-				processedRooms[event.RoomID] = true
+				log.Println("Is management room:", evt.RoomID, isManagementRoom)
+				processedRooms[evt.RoomID] = true
 
 				if !isManagementRoom {
-					members, err := room.GetRoomMembers(b.Client, event.RoomID)
+					members, err := room.GetRoomMembers(b.Client, evt.RoomID)
 					if err != nil {
 						log.Println("Failed getting room members", err)
 						return
@@ -376,7 +389,7 @@ func (b *Bridges) CreateContactRooms() error {
 
 					if foundDevice && len(foundMembers) > 0 {
 						for _, fMember := range foundMembers {
-							clientDb.StoreRooms(event.RoomID.String(), b.Name, foundDeviceUserName, fMember, false)
+							clientDb.StoreRooms(evt.RoomID.String(), b.Name, foundDeviceUserName, fMember, false)
 							// log.Println("Stored room:", event.RoomID.String(), b.Name, fMember, false, foundDeviceUserName)
 						}
 					}

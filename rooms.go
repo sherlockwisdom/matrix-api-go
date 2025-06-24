@@ -105,6 +105,24 @@ func (r *Rooms) GetRoomInfo() (string, error) {
 	return nameContent.Name, nil
 }
 
+func (r *Rooms) GetPowerLevelsUser() (int, error) {
+	var powerLevels event.PowerLevelsEventContent
+	err := r.Client.StateEvent(context.Background(), r.ID, event.StatePowerLevels, "", &powerLevels)
+	if err != nil {
+		return -1, err
+	}
+	return powerLevels.Users[r.Client.UserID], nil
+}
+
+func (r *Rooms) GetPowerLevelsEvents() (int, error) {
+	var powerLevels event.PowerLevelsEventContent
+	err := r.Client.StateEvent(context.Background(), r.ID, event.StatePowerLevels, "", &powerLevels)
+	if err != nil {
+		return -1, err
+	}
+	return powerLevels.Events[event.EventMessage.String()], nil
+}
+
 // IsSpaceRoom checks if the given room is a space
 func (r *Rooms) IsSpaceRoom() (bool, error) {
 	var createContent event.CreateEventContent

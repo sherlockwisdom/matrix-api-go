@@ -279,6 +279,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 	go func() {
 		for _, bridge := range bridges {
 			bridge.Client = client
+			bridge.Client.StateStore = mautrix.NewMemoryStateStore()
 			if _, ok := syncingUsers[user.Username]; !ok {
 				syncingUsers[user.Username] = []string{}
 			}

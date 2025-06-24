@@ -131,7 +131,6 @@ func (c *Controller) SendMessage(username, message, contact, platform, deviceNam
 
 	room := rooms[0]
 	if fileData != nil {
-		// Send PDF file
 		uploadResp, err := c.Client.UploadBytesWithName(
 			context.Background(),
 			fileData,
@@ -177,38 +176,6 @@ func (c *Controller) SendMessage(username, message, contact, platform, deviceNam
 }
 
 func (c *Controller) ListDevices(username, platform string) ([]string, error) {
-	// bridge := &Bridges{
-	// 	Name:   platform,
-	// 	Client: c.Client,
-	// }
-
-	// clientDb := ClientDB{
-	// 	username: username,
-	// 	filepath: "db/" + username + ".db",
-	// }
-	// clientDb.Init()
-	// bridges, err := clientDb.FetchBridgeRooms(username)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// for _, _bridge := range bridges {
-	// 	if _bridge.Name == platform {
-	// 		bridge.RoomID = _bridge.RoomID
-	// 		break
-	// 	}
-	// }
-
-	// if bridge.RoomID == "" {
-	// 	return nil, fmt.Errorf("bridge room not found for: %s", platform)
-	// }
-
-	// log.Println("Listing devices for", username, platform, bridge.RoomID)
-
-	// devices, err := bridge.ListDevices()
-	// if err != nil {
-	// 	return nil, err
-	// }
 	devices := ClientDevices[username][platform]
 
 	return devices, nil
