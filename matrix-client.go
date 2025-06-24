@@ -338,7 +338,7 @@ func (m *MatrixClient) processIncomingEvents(evt *event.Event) error {
 				continue
 			}
 
-			if subscriber.Since != nil && subscriber.Since.After(time.Unix(evt.Timestamp, 0)) {
+			if subscriber.Since != nil && evt.Timestamp <= subscriber.Since.UnixMilli() {
 				continue
 			}
 

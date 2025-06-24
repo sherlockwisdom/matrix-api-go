@@ -53,11 +53,10 @@ type ClientJsonRequest struct {
 // @name ClientMessageJsonRequeset
 // @type object
 type ClientMessageJsonRequeset struct {
-	Username    string `json:"username" example:"john_doe"`
-	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
-	Message     string `json:"message" example:"Hello, world!"`
-	DeviceName  string `json:"device_name" example:"237123456789"`
-	FileData    []byte `json:"file_data" example:"[file_data]"`
+	Username   string `json:"username" example:"john_doe"`
+	Message    string `json:"message" example:"Hello, world!"`
+	DeviceName string `json:"device_name" example:"237123456789"`
+	FileData   []byte `json:"file_data" example:"[file_data]"`
 }
 
 // ClientBridgeJsonRequest represents bridge connection details
@@ -65,8 +64,7 @@ type ClientMessageJsonRequeset struct {
 // @name ClientBridgeJsonRequest
 // @type object
 type ClientBridgeJsonRequest struct {
-	Username    string `json:"username" example:"john_doe"`
-	AccessToken string `json:"access_token" example:"syt_YWxwaGE..."`
+	Username string `json:"username" example:"john_doe"`
 }
 
 // LoginResponse represents the response for successful login
@@ -184,6 +182,27 @@ func sanitizeDeviceName(deviceName string) (string, error) {
 	}
 
 	return deviceName, nil
+}
+
+// Helper function to extract Bearer token from Authorization header
+func extractBearerToken(c *gin.Context) (string, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("Authorization header is required")
+	}
+
+	// Check if it starts with "Bearer "
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", fmt.Errorf("Authorization header must start with 'Bearer '")
+	}
+
+	// Extract the token (remove "Bearer " prefix)
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == "" {
+		return "", fmt.Errorf("Bearer token cannot be empty")
+	}
+
+	return token, nil
 }
 
 // ApiLogin godoc
@@ -314,13 +333,22 @@ func ApiCreate(c *gin.Context) {
 // @Produce  json
 // @Param   platform path string true "Platform Name" example:"telegram"
 // @Param   contact path string true "Contact ID (E.164 phone number without the plus)" example:"1234567890"
+// @Param   Authorization header string true "Bearer token" example:"Bearer syt_YWxwaGE..."
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
 // @Success 200 {object} MessageResponse "Message sent successfully"
 // @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Invalid or missing Bearer token"
 // @Failure 500 {object} ErrorResponse "Failed to send message"
 // @Router /{platform}/message/{contact} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset
+
+	// Extract Bearer token from Authorization header
+	accessToken, err := extractBearerToken(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Sanitize platform and contact parameters
 	platform, err := sanitizePlatform(c.Param("platform"))
@@ -344,10 +372,6 @@ func ApiSendMessage(c *gin.Context) {
 	// Validate required fields
 	if req.Username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
-		return
-	}
-	if req.AccessToken == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Access token is required"})
 		return
 	}
 	if req.Message == "" {
@@ -383,7 +407,7 @@ func ApiSendMessage(c *gin.Context) {
 	cfg, _ := (&Conf{}).getConf()
 	homeServer := cfg.HomeServer
 
-	client, err := mautrix.NewClient(homeServer, id.NewUserID(username, cfg.HomeServerDomain), req.AccessToken)
+	client, err := mautrix.NewClient(homeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
@@ -394,7 +418,7 @@ func ApiSendMessage(c *gin.Context) {
 	matrixClient := MatrixClient{
 		Client: client,
 	}
-	_, err = matrixClient.LoadActiveSessionsByAccessToken(req.AccessToken)
+	_, err = matrixClient.LoadActiveSessionsByAccessToken(accessToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
 		return
@@ -434,14 +458,22 @@ func ApiSendMessage(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   platform path string true "Platform Name" example:"wa"
+// @Param   Authorization header string true "Bearer token" example:"Bearer syt_YWxwaGE..."
 // @Param   payload body ClientBridgeJsonRequest true "Device Payload"
 // @Success 200 {object} DeviceResponse "Successfully added device and established websocket connection"
 // @Failure 400 {object} ErrorResponse "Invalid request"
-// @Failure 401 {object} ErrorResponse "Invalid access token"
+// @Failure 401 {object} ErrorResponse "Invalid or missing Bearer token"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{platform}/devices [post]
 func ApiAddDevice(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
+
+	// Extract Bearer token from Authorization header
+	accessToken, err := extractBearerToken(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Sanitize platform parameter
 	platformName, err := sanitizePlatform(c.Param("platform"))
@@ -464,7 +496,7 @@ func ApiAddDevice(c *gin.Context) {
 	}
 
 	client, err := mautrix.NewClient(
-		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
+		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
 
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)
@@ -475,7 +507,7 @@ func ApiAddDevice(c *gin.Context) {
 	matrixClient := MatrixClient{
 		Client: client,
 	}
-	_, err = matrixClient.LoadActiveSessionsByAccessToken(bridgeJsonRequest.AccessToken)
+	_, err = matrixClient.LoadActiveSessionsByAccessToken(accessToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid access token", "details": err.Error()})
 		return
@@ -504,14 +536,22 @@ func ApiAddDevice(c *gin.Context) {
 // @Accept  json
 // @Produce  json
 // @Param   platform path string true "Platform Name" example:"wa"
+// @Param   Authorization header string true "Bearer token" example:"Bearer syt_YWxwaGE..."
 // @Param   payload body ClientBridgeJsonRequest true "Device List Request"
 // @Success 200 {object} map[string]interface{} "List of devices"
 // @Failure 400 {object} ErrorResponse "Invalid request"
-// @Failure 401 {object} ErrorResponse "Invalid access token"
+// @Failure 401 {object} ErrorResponse "Invalid or missing Bearer token"
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{platform}/list/devices [post]
 func ApiListDevices(c *gin.Context) {
 	var bridgeJsonRequest ClientBridgeJsonRequest
+
+	// Extract Bearer token from Authorization header
+	accessToken, err := extractBearerToken(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
 	if err := c.ShouldBindJSON(&bridgeJsonRequest); err != nil {
 		log.Printf("Invalid request payload: %v", err)
@@ -526,7 +566,7 @@ func ApiListDevices(c *gin.Context) {
 	}
 
 	client, err := mautrix.NewClient(
-		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), bridgeJsonRequest.AccessToken)
+		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
 
 	if err != nil {
 		log.Printf("Failed to create Matrix client: %v", err)

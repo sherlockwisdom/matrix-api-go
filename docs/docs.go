@@ -132,6 +132,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "description": "Device Payload",
                         "name": "payload",
                         "in": "body",
@@ -155,7 +162,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Invalid access token",
+                        "description": "Invalid or missing Bearer token",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -188,6 +195,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "description": "Device List Request",
                         "name": "payload",
                         "in": "body",
@@ -212,7 +226,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Invalid access token",
+                        "description": "Invalid or missing Bearer token",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -252,6 +266,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "description": "Message Payload",
                         "name": "payload",
                         "in": "body",
@@ -274,6 +295,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Invalid or missing Bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Failed to send message",
                         "schema": {
@@ -289,10 +316,6 @@ const docTemplate = `{
             "description": "Request payload to bind a platform bridge to a user",
             "type": "object",
             "properties": {
-                "access_token": {
-                    "type": "string",
-                    "example": "syt_YWxwaGE..."
-                },
                 "username": {
                     "type": "string",
                     "example": "john_doe"

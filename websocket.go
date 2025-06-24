@@ -95,20 +95,20 @@ func (ws *Websockets) Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error initializing client db:", err)
 	}
 
-	if IsActiveSessionsExpired(&clientDb, ws.Bridge.Client.UserID.Localpart()) {
-		log.Println("Active sessions expired, removing active sessions")
-		clientDb.RemoveActiveSessions(ws.Bridge.Client.UserID.Localpart())
-	} else {
-		sessions, _, err := clientDb.FetchActiveSessions(ws.Bridge.Client.UserID.Localpart())
-		if err != nil {
-			log.Println("Error fetching active sessions:", err)
-		}
+	// if IsActiveSessionsExpired(&clientDb, ws.Bridge.Client.UserID.Localpart()) {
+	// 	log.Println("Active sessions expired, removing active sessions")
+	// 	clientDb.RemoveActiveSessions(ws.Bridge.Client.UserID.Localpart())
+	// } else {
+	// 	sessions, _, err := clientDb.FetchActiveSessions(ws.Bridge.Client.UserID.Localpart())
+	// 	if err != nil {
+	// 		log.Println("Error fetching active sessions:", err)
+	// 	}
 
-		if len(sessions) > 0 {
-			log.Println("Active sessions found, sending message to client socket")
-		}
-		conn.WriteMessage(websocket.BinaryMessage, sessions)
-	}
+	// 	if len(sessions) > 0 {
+	// 		log.Println("Active sessions found, sending message to client socket")
+	// 	}
+	// 	conn.WriteMessage(websocket.BinaryMessage, sessions)
+	// }
 
 	err = ws.Bridge.AddDevice(ch)
 	if err != nil {

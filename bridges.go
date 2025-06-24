@@ -21,7 +21,7 @@ type Bridges struct {
 }
 
 func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan []byte) {
-	since := time.Now().UnixMilli() - (100 * 1000)
+	since := time.Now().UTC()
 
 	var clientDb = ClientDB{
 		username: b.Client.UserID.Localpart(),
@@ -33,26 +33,27 @@ func (b *Bridges) processIncomingLoginMessages(bridgeCfg *BridgeConfig, ch chan 
 		return
 	}
 
+	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) + "+login"
 	eventSubscriber := EventSubscriber{}
 	for _, subscriber := range EventSubscribers {
-		if subscriber.Name ==
-			ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) &&
-			subscriber.MsgType == nil {
+		if subscriber.Name == eventSubName && subscriber.MsgType == nil {
+			log.Println("Found event subscriber for:", eventSubName)
 			eventSubscriber = subscriber
 		}
 	}
 
 	if eventSubscriber.Name == "" {
-		eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) + "+login"
+		log.Println("No event subscriber found for:", eventSubName)
 		eventSubscriber = EventSubscriber{
 			Name:    eventSubName,
 			MsgType: nil,
+			ExcludeMsgTypes: []event.MessageType{
+				event.MsgText,
+			},
+			Since:  &since,
+			RoomID: b.RoomID,
 			Callback: func(evt *event.Event) {
-				if evt.RoomID == b.RoomID &&
-					evt.Sender != b.Client.UserID &&
-					evt.Timestamp >= since &&
-					evt.Type == event.EventMessage {
-
+				if evt.Sender != b.Client.UserID && evt.Type == event.EventMessage {
 					failedCmd := bridgeCfg.Cmd["failed"]
 
 					matchesSuccess, err := cfg.CheckSuccessPattern(b.Name, evt.Content.AsMessage().Body)
@@ -230,9 +231,9 @@ func (b *Bridges) JoinRooms() error {
 func (b *Bridges) ListDevices() ([]string, error) {
 	log.Println("Listing devices for:", b.Name, b.RoomID)
 	ch := make(chan []string)
-	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain)
+	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) + "+devices"
 	eventType := event.MsgNotice
-	eventSince := time.Now()
+	eventSince := time.Now().UTC()
 	eventSubscriber := EventSubscriber{
 		Name:    eventSubName,
 		MsgType: &eventType,
@@ -244,7 +245,7 @@ func (b *Bridges) ListDevices() ([]string, error) {
 			for _, device := range devicesRaw {
 				deviceName, err := ExtractBracketContent(device)
 				if err != nil {
-					log.Println("Failed extracting device name", err)
+					log.Println("Failed extracting device name", err, device)
 					continue
 				}
 				devices = append(devices, deviceName)
