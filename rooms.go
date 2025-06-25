@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -137,4 +138,24 @@ func (r *Rooms) IsSpaceRoom() (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (r *Rooms) GetInvites(
+	evt *event.Event,
+) error {
+	if evt.Content.AsMember().Membership == event.MembershipInvite {
+		log.Println("Invite received for:", r.ID, evt.Content.AsMember().Membership)
+		// if evt.StateKey != nil && *evt.StateKey == r.Client.UserID.String() {
+		// 	_, err := r.Client.JoinRoomByID(context.Background(), r.ID)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
+
+		_, err := r.Client.JoinRoomByID(context.Background(), r.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

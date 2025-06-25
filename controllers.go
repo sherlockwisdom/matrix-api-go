@@ -17,6 +17,7 @@ var ClientDevices = make(map[string]map[string][]string)
 
 type EventSubscriber struct {
 	Name            string
+	EventType       string
 	MsgType         *event.MessageType
 	ExcludeMsgTypes []event.MessageType
 	Callback        func(event *event.Event)
@@ -127,6 +128,11 @@ func (c *Controller) SendMessage(username, message, contact, platform, deviceNam
 	if len(rooms) > 1 {
 		log.Println("Multiple rooms found for", formattedUsername, rooms)
 		return fmt.Errorf("multiple rooms found for: %s", formattedUsername)
+	}
+
+	if len(rooms) == 0 {
+		log.Println("No rooms found for", formattedUsername)
+		return fmt.Errorf("no rooms found for: %s", formattedUsername)
 	}
 
 	room := rooms[0]

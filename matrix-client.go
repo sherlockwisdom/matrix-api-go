@@ -181,20 +181,6 @@ func (m *MatrixClient) Create(username string, password string) (string, error) 
 	return resp.AccessToken, nil
 }
 
-func (b *Bridges) GetInvites(
-	evt *event.Event,
-) error {
-	if evt.Content.AsMember().Membership == event.MembershipInvite {
-		if evt.StateKey != nil && *evt.StateKey == b.Client.UserID.String() {
-			_, err := b.Client.JoinRoomByID(context.Background(), evt.RoomID)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func (m *MatrixClient) Sync(ch chan *event.Event) error {
 	syncer := mautrix.NewDefaultSyncer()
 	m.Client.Syncer = syncer
@@ -279,7 +265,7 @@ func (m *MatrixClient) syncClient(user Users) error {
 	go func() {
 		for _, bridge := range bridges {
 			bridge.Client = client
-			bridge.Client.StateStore = mautrix.NewMemoryStateStore()
+			// bridge.Client.StateStore = mautrix.NewMemoryStateStore()
 			if _, ok := syncingUsers[user.Username]; !ok {
 				syncingUsers[user.Username] = []string{}
 			}
@@ -312,6 +298,10 @@ func (m *MatrixClient) syncClient(user Users) error {
 				bridge.CreateContactRooms()
 				log.Println("Joined member rooms for bridge:", bridge.Name)
 				// wg.Done()
+			}(bridge)
+
+			go func(bridge *Bridges) {
+				bridge.GetRoomInvitesDaemon()
 			}(bridge)
 		}
 	}()

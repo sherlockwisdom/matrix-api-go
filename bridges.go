@@ -458,3 +458,38 @@ func (b *Bridges) CreateContactRooms() error {
 
 	return nil
 }
+
+func (b *Bridges) GetRoomInvitesDaemon() error {
+	log.Println("Getting room invites for:", b.Name, b.RoomID)
+
+	resp, err := b.Client.SyncRequest(context.Background(), 30000, "", "", true, event.PresenceOnline)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for roomID := range resp.Rooms.Invite {
+		log.Printf("You have been invited to room: %s\n", roomID)
+		_, err := b.Client.JoinRoomByID(context.Background(), roomID)
+		if err != nil {
+			log.Println("Failed joining room", err)
+		}
+	}
+
+	eventSubName := ReverseAliasForEventSubscriber(b.Client.UserID.Localpart(), b.Name, cfg.HomeServerDomain) + "+invites"
+	eventSubscriber := EventSubscriber{
+		Name:    eventSubName,
+		MsgType: nil,
+		Callback: func(evt *event.Event) {
+			log.Println("Received event:", evt.RoomID, evt.Content.AsMember())
+			room := Rooms{
+				Client: b.Client,
+				ID:     evt.RoomID,
+			}
+			room.GetInvites(evt)
+		},
+	}
+
+	EventSubscribers = append(EventSubscribers, eventSubscriber)
+
+	return nil
+}
