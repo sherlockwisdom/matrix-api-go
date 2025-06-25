@@ -49,14 +49,14 @@ type ClientJsonRequest struct {
 }
 
 // ClientMessageJsonRequeset represents a message sending request
-// @Description Request payload to send a message to a room
+// @Description Request payload to send a message to a contact through a platform bridge. All fields are validated according to specific rules.
 // @name ClientMessageJsonRequeset
 // @type object
 type ClientMessageJsonRequeset struct {
-	Username   string `json:"username" example:"john_doe"`
-	Message    string `json:"message" example:"Hello, world!"`
-	DeviceName string `json:"device_name" example:"237123456789"`
-	FileData   []byte `json:"file_data" example:"[file_data]"`
+	Username   string `json:"username" example:"john_doe" binding:"required"`       // Required: 3-32 characters, letters, numbers, underscores only
+	Message    string `json:"message" example:"Hello, world!" binding:"required"`   // Required: 1-4096 characters, cannot be empty
+	DeviceName string `json:"device_name" example:"wa123456789" binding:"required"` // Required: 2-20 characters, letters and numbers only
+	FileData   []byte `json:"file_data,omitempty" example:"[file_data]"`            // Optional: Binary file data for attachments
 }
 
 // ClientBridgeJsonRequest represents bridge connection details
@@ -327,18 +327,24 @@ func ApiCreate(c *gin.Context) {
 }
 
 // ApiSendMessage godoc
-// @Summary Sends a message to a specified room
-// @Description Sends a message to a contact through the specified platform bridge
+// @Summary Sends a message to a contact through a platform bridge
+// @Description Sends a message to a contact through the specified platform bridge. The message can include text and optional file data.
+// @Description The function validates and sanitizes all input fields according to the following rules:
+// @Description - Username: 3-32 characters, letters, numbers, and underscores only
+// @Description - Message: 1-4096 characters, cannot be empty
+// @Description - Device name: 2-20 characters, letters and numbers only
+// @Description - Contact: Valid E.164 phone number format (8-15 digits)
+// @Description - Platform: 2-20 characters, letters and numbers only
 // @Accept  json
 // @Produce  json
-// @Param   platform path string true "Platform Name" example:"telegram"
-// @Param   contact path string true "Contact ID (E.164 phone number without the plus)" example:"1234567890"
+// @Param   platform path string true "Platform Name (2-20 characters, letters and numbers only)" example:"wa"
+// @Param   contact path string true "Contact ID (E.164 phone number without the plus sign, 8-15 digits)" example:"1234567890"
 // @Param   Authorization header string true "Bearer token" example:"Bearer syt_YWxwaGE..."
 // @Param   payload body ClientMessageJsonRequeset true "Message Payload"
-// @Success 200 {object} MessageResponse "Message sent successfully"
-// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Success 200 {object} map[string]interface{} "Message sent successfully" example:{"contact":"1234567890","message":"Hello, world!","status":"sent"}
+// @Failure 400 {object} ErrorResponse "Invalid request - validation errors for username, message, device_name, platform, or contact"
 // @Failure 401 {object} ErrorResponse "Invalid or missing Bearer token"
-// @Failure 500 {object} ErrorResponse "Failed to send message"
+// @Failure 500 {object} ErrorResponse "Failed to send message or internal server error"
 // @Router /{platform}/message/{contact} [post]
 func ApiSendMessage(c *gin.Context) {
 	var req ClientMessageJsonRequeset

@@ -240,25 +240,25 @@
         },
         "/{platform}/message/{contact}": {
             "post": {
-                "description": "Sends a message to a contact through the specified platform bridge",
+                "description": "Sends a message to a contact through the specified platform bridge. The message can include text and optional file data.\nThe function validates and sanitizes all input fields according to the following rules:\n- Username: 3-32 characters, letters, numbers, and underscores only\n- Message: 1-4096 characters, cannot be empty\n- Device name: 2-20 characters, letters and numbers only\n- Contact: Valid E.164 phone number format (8-15 digits)\n- Platform: 2-20 characters, letters and numbers only",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Sends a message to a specified room",
+                "summary": "Sends a message to a contact through a platform bridge",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Platform Name",
+                        "description": "Platform Name (2-20 characters, letters and numbers only)",
                         "name": "platform",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Contact ID (E.164 phone number without the plus)",
+                        "description": "Contact ID (E.164 phone number without the plus sign, 8-15 digits)",
                         "name": "contact",
                         "in": "path",
                         "required": true
@@ -282,13 +282,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Message sent successfully",
+                        "description": "Message sent successfully\" example:{\"contact\":\"1234567890\",\"message\":\"Hello, world!\",\"status\":\"sent\"}",
                         "schema": {
-                            "$ref": "#/definitions/main.MessageResponse"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request - validation errors for username, message, device_name, platform, or contact",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -300,7 +301,7 @@
                         }
                     },
                     "500": {
-                        "description": "Failed to send message",
+                        "description": "Failed to send message or internal server error",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -376,28 +377,6 @@
                 "username": {
                     "type": "string",
                     "example": "john_doe"
-                }
-            }
-        },
-        "main.MessageResponse": {
-            "description": "Response payload for successful message sending",
-            "type": "object",
-            "properties": {
-                "contact": {
-                    "type": "string",
-                    "example": "+1234567890"
-                },
-                "event_id": {
-                    "type": "string",
-                    "example": "$1234567890abcdef"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Hello, world!"
-                },
-                "status": {
-                    "type": "string",
-                    "example": "sent"
                 }
             }
         }
