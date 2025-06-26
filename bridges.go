@@ -480,7 +480,7 @@ func (b *Bridges) GetRoomInvitesDaemon() error {
 		Name:    eventSubName,
 		MsgType: nil,
 		Callback: func(evt *event.Event) {
-			log.Println("Received event:", evt.RoomID, evt.Content.AsMember())
+			// log.Println("Received event:", evt.RoomID, evt.Content.AsMember())
 			room := Rooms{
 				Client: b.Client,
 				ID:     evt.RoomID,

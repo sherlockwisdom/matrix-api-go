@@ -673,31 +673,31 @@ func main() {
 	router.GET("/tutorials", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{})
 	})
-	router.GET("/tutorials/index.html", func(c *gin.Context) {
+	router.GET("/index.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{})
 	})
-	router.GET("/tutorials/getting-started.html", func(c *gin.Context) {
+	router.GET("/getting-started.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "getting-started.html", gin.H{})
 	})
-	router.GET("/tutorials/adding-devices.html", func(c *gin.Context) {
+	router.GET("/adding-devices.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "adding-devices.html", gin.H{})
 	})
-	router.GET("/tutorials/listing-devices.html", func(c *gin.Context) {
+	router.GET("/listing-devices.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "listing-devices.html", gin.H{})
 	})
-	router.GET("/tutorials/sending-messages.html", func(c *gin.Context) {
+	router.GET("/sending-messages.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "sending-messages.html", gin.H{})
 	})
-	router.GET("/tutorials/user-management.html", func(c *gin.Context) {
+	router.GET("/user-management.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "user-management.html", gin.H{})
 	})
-	router.GET("/tutorials/search.html", func(c *gin.Context) {
+	router.GET("/search.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "search.html", gin.H{})
 	})
-	router.GET("/tutorials/genindex.html", func(c *gin.Context) {
+	router.GET("/genindex.html", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "genindex.html", gin.H{})
 	})
-	router.GET("/tutorials/py-modindex.html", func(c *gin.Context) {
+	router.GET("/py-modindex.html", func(c *gin.Context) {
 		// This file doesn't exist, redirect to genindex instead
 		c.Redirect(http.StatusMovedPermanently, "/genindex.html")
 	})
