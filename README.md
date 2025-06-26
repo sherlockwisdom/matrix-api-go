@@ -14,14 +14,44 @@ A Go-based Matrix messaging bridge API that enables seamless communication acros
 - Platform Bridge Management
   - Add bridges for different platforms (WhatsApp, Signal)
   - WebSocket support for real-time communication
-- Swagger Documentation
-  - API documentation available at `/swagger/*`
+- Interactive API Documentation
+  - Swagger UI available at `/docs` when server is running
 
 ## Prerequisites
 
 - Go 1.x
 - Matrix server instance
 - TLS certificates (for HTTPS support)
+- Python 3.x (for documentation generation)
+
+## Installation
+
+### Go Dependencies
+
+```bash
+go mod download
+```
+
+### Documentation Dependencies
+
+The project includes comprehensive documentation built with Sphinx. To set up the documentation environment:
+
+1. Navigate to the tutorials directory:
+```bash
+cd tutorials
+```
+
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Build the documentation:
+```bash
+make html
+```
+
+The built documentation will be available in `tutorials/_build/html/`.
 
 ## Configuration
 
@@ -37,23 +67,16 @@ cp conf.yaml.example conf.yaml
    - Keystore filepath
    - Default user credentials
 
-## API Endpoints
+## API Documentation
 
-### User Management
+When the server is running, you can access the interactive API documentation at:
+- **Swagger UI**: `http://localhost:8080/docs` (or your configured host/port)
 
-- `POST /` - Create a new user
-- `POST /login` - Login existing user
-
-### Messaging
-
-- `POST /{platform}/message/{contact}` - Send a message to a contact
-  - `platform`: Supported platform (e.g., 'wa' for WhatsApp)
-  - `contact`: E.164 phone number (without '+' prefix)
-
-### Bridge Management
-
-- `POST /{platform}/devices` - Add a new bridge for a platform
-  - Returns WebSocket URL for real-time communication
+The documentation provides:
+- Complete API endpoint reference
+- Interactive testing interface
+- Request/response examples
+- Authentication details
 
 ## WebSocket Support
 
@@ -78,9 +101,35 @@ The WebSocket server runs on port 8090 by default:
 - HTTP: `ws://localhost:8090`
 - HTTPS: `wss://localhost:8090`
 
-## API Documentation
+### Documentation Server
 
-Swagger documentation is available at `/swagger/*` when the server is running.
+To serve the built documentation locally:
+
+```bash
+cd tutorials/_build/html
+python -m http.server 8000
+```
+
+Then visit `http://localhost:8000` to view the documentation.
+
+## Development
+
+### Building Documentation
+
+To rebuild the documentation after making changes:
+
+```bash
+cd tutorials
+make clean
+make html
+```
+
+### Documentation Structure
+
+- `tutorials/` - Sphinx documentation source
+- `tutorials/_build/` - Generated documentation output
+- `tutorials/requirements.txt` - Python dependencies for documentation
+- `tutorials/Makefile` - Build commands for documentation
 
 ## Security
 
