@@ -2,3 +2,5 @@
 *.yaml
 matrix
 matrix-api-go
+venv/*
+venv

@@ -663,7 +663,44 @@ func main() {
 	router.DELETE("/devices/:device_id", ApiDeleteDevice)
 	router.DELETE("/platforms/:platform/devices/device_id", ApiDeletePlatform)
 
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// Serve static files for documentation
+	router.Static("/_static", "./tutorials/_build/html/_static")
+
+	// router.LoadHTMLFiles("./tutorials/_build/html/index.html")
+	router.LoadHTMLGlob("./tutorials/_build/html/*.html")
+	router.GET("/tutorials", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{})
+	})
+	router.GET("/tutorials/index.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{})
+	})
+	router.GET("/tutorials/getting-started.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "getting-started.html", gin.H{})
+	})
+	router.GET("/tutorials/adding-devices.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "adding-devices.html", gin.H{})
+	})
+	router.GET("/tutorials/listing-devices.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "listing-devices.html", gin.H{})
+	})
+	router.GET("/tutorials/sending-messages.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "sending-messages.html", gin.H{})
+	})
+	router.GET("/tutorials/user-management.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "user-management.html", gin.H{})
+	})
+	router.GET("/tutorials/search.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "search.html", gin.H{})
+	})
+	router.GET("/tutorials/genindex.html", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "genindex.html", gin.H{})
+	})
+	router.GET("/tutorials/py-modindex.html", func(c *gin.Context) {
+		// This file doesn't exist, redirect to genindex instead
+		c.Redirect(http.StatusMovedPermanently, "/genindex.html")
+	})
 
 	ks.Init()
 
