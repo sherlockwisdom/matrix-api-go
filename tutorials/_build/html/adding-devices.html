@@ -8,7 +8,6 @@
     <title>Adding Devices &#8212; ShortMesh 1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8e8a900e" />
       <link rel="stylesheet" type="text/css" href="_static/css/pdj.css?v=12f78f94" />
-      <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=a5c4661c" />
 
 <link rel="stylesheet" href="_static/css/darker.css" type="text/css"
       media="(prefers-color-scheme: dark)"/>
@@ -16,7 +15,6 @@
     <script src="_static/documentation_options.js?v=29a6c3e3"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script src="_static/tabs.js?v=3030b3cb"></script>
     <script src="_static/js/pdj.js"></script>
 
     <script type="module" src="_static/js/dark-mode-toggle.js"></script>
@@ -51,372 +49,43 @@
 	  </div>
   <section id="adding-devices">
 <h1>Adding Devices<a class="headerlink" href="#adding-devices" title="Link to this heading">¶</a></h1>
-<p>The ShortMesh API allows you to add new device connections for different messaging platforms. This guide covers how to add devices and establish WebSocket connections for real-time communication.</p>
-<p><strong>Endpoint</strong>: <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/{platform}/devices</span></code></p>
-<p><strong>Headers</strong>:
-- <code class="docutils literal notranslate"><span class="pre">Authorization:</span> <span class="pre">Bearer</span> <span class="pre">YOUR_ACCESS_TOKEN</span></code>
-- <code class="docutils literal notranslate"><span class="pre">Content-Type:</span> <span class="pre">application/json</span></code></p>
-<p><strong>Request Body</strong>:
-.. code-block:: json</p>
-<blockquote>
-<div><dl class="simple">
-<dt>{</dt><dd><p>“username”: “your_username”</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<p><strong>Response</strong>:
-.. code-block:: json</p>
-<blockquote>
-<div><dl class="simple">
-<dt>{</dt><dd><p>“websocket_url”: “ws://localhost:8080/ws/wa/john_doe”</p>
-</dd>
-</dl>
-<p>}</p>
-</div></blockquote>
-<section id="supported-platforms">
-<h2>Supported Platforms<a class="headerlink" href="#supported-platforms" title="Link to this heading">¶</a></h2>
-<p>The following platforms are supported:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">wa</span></code> - WhatsApp</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">signal</span></code> - Signal (coming soon)</p></li>
-</ul>
-</section>
-<section id="websocket-connection">
-<h2>WebSocket Connection<a class="headerlink" href="#websocket-connection" title="Link to this heading">¶</a></h2>
-<p>When you add a device, the API returns a WebSocket URL that you can use to establish a real-time connection. The WebSocket connection will:</p>
-<ul class="simple">
-<li><p>Receive media/images from the platform bridge</p></li>
-<li><p>Handle login synchronization events</p></li>
-<li><p>Send existing active sessions if available</p></li>
-<li><p>Close connection when receiving nil data (indicating end of session or error)</p></li>
-</ul>
-</section>
-<section id="code-examples">
-<h2>Code Examples<a class="headerlink" href="#code-examples" title="Link to this heading">¶</a></h2>
-<div class="sphinx-tabs docutils container">
-<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-0-0-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-0-0-0" name="0-0" role="tab" tabindex="0">Python</button><button aria-controls="panel-0-0-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-0-0-1" name="0-1" role="tab" tabindex="-1">JavaScript (Node.js)</button><button aria-controls="panel-0-0-2" aria-selected="false" class="sphinx-tabs-tab" id="tab-0-0-2" name="0-2" role="tab" tabindex="-1">PHP</button></div><div aria-labelledby="tab-0-0-0" class="sphinx-tabs-panel" id="panel-0-0-0" name="0-0" role="tabpanel" tabindex="0"><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">websocket</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">dotenv</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dotenv</span>
-
-<span class="c1"># Load environment variables</span>
-<span class="n">load_dotenv</span><span class="p">()</span>
-
-<span class="c1"># Configuration</span>
-<span class="n">API_BASE_URL</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_API_URL&#39;</span><span class="p">,</span> <span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">)</span>
-<span class="n">ACCESS_TOKEN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN&#39;</span><span class="p">)</span>
-<span class="n">USERNAME</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME&#39;</span><span class="p">)</span>
-<span class="n">PLATFORM</span> <span class="o">=</span> <span class="s2">&quot;wa&quot;</span>  <span class="c1"># wa for WhatsApp, signal for Signal</span>
-
-<span class="c1"># Validate required configuration</span>
-<span class="k">if</span> <span class="ow">not</span> <span class="n">ACCESS_TOKEN</span><span class="p">:</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SHORTMESH_ACCESS_TOKEN environment variable is required&quot;</span><span class="p">)</span>
-<span class="k">if</span> <span class="ow">not</span> <span class="n">USERNAME</span><span class="p">:</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SHORTMESH_USERNAME environment variable is required&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">add_device</span><span class="p">(</span><span class="n">platform</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">access_token</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add a new device for the specified platform&quot;&quot;&quot;</span>
-    <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">API_BASE_URL</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">platform</span><span class="si">}</span><span class="s2">/devices&quot;</span>
-    <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="n">username</span><span class="p">}</span>
-    <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">access_token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span>
-    <span class="p">}</span>
-
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✅ Device added successfully!&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WebSocket URL: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;websocket_url&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;websocket_url&#39;</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Failed to add device: </span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
-            <span class="k">return</span> <span class="kc">None</span>
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Error adding device: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="kc">None</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">on_message</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle incoming WebSocket messages&quot;&quot;&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📨 Received message: </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">on_error</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle WebSocket errors&quot;&quot;&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ WebSocket error: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">on_close</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="n">close_status_code</span><span class="p">,</span> <span class="n">close_msg</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle WebSocket connection close&quot;&quot;&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;🔌 WebSocket connection closed&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">on_open</span><span class="p">(</span><span class="n">ws</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle WebSocket connection open&quot;&quot;&quot;</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;🔌 WebSocket connection established&quot;</span><span class="p">)</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">connect_websocket</span><span class="p">(</span><span class="n">websocket_url</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Establish WebSocket connection&quot;&quot;&quot;</span>
-    <span class="n">ws</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">WebSocketApp</span><span class="p">(</span>
-        <span class="n">websocket_url</span><span class="p">,</span>
-        <span class="n">on_open</span><span class="o">=</span><span class="n">on_open</span><span class="p">,</span>
-        <span class="n">on_message</span><span class="o">=</span><span class="n">on_message</span><span class="p">,</span>
-        <span class="n">on_error</span><span class="o">=</span><span class="n">on_error</span><span class="p">,</span>
-        <span class="n">on_close</span><span class="o">=</span><span class="n">on_close</span>
-    <span class="p">)</span>
-
-    <span class="c1"># Run WebSocket in a separate thread</span>
-    <span class="n">wst</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">ws</span><span class="o">.</span><span class="n">run_forever</span><span class="p">)</span>
-    <span class="n">wst</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
-    <span class="n">wst</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-
-    <span class="k">return</span> <span class="n">ws</span>
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="c1"># Add device</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== Adding Device ===&quot;</span><span class="p">)</span>
-    <span class="n">websocket_url</span> <span class="o">=</span> <span class="n">add_device</span><span class="p">(</span><span class="n">PLATFORM</span><span class="p">,</span> <span class="n">USERNAME</span><span class="p">,</span> <span class="n">ACCESS_TOKEN</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">websocket_url</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">=== Establishing WebSocket Connection ===&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Connecting to: </span><span class="si">{</span><span class="n">websocket_url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Connect to WebSocket</span>
-        <span class="n">ws</span> <span class="o">=</span> <span class="n">connect_websocket</span><span class="p">(</span><span class="n">websocket_url</span><span class="p">)</span>
-
-        <span class="c1"># Keep the main thread alive</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-                <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">🛑 Shutting down...&quot;</span><span class="p">)</span>
-            <span class="n">ws</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</pre></div>
-</div>
-</div><div aria-labelledby="tab-0-0-1" class="sphinx-tabs-panel" hidden="true" id="panel-0-0-1" name="0-1" role="tabpanel" tabindex="0"><div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;dotenv&#39;</span><span class="p">).</span><span class="nx">config</span><span class="p">();</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">axios</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;axios&#39;</span><span class="p">);</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">WebSocket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;ws&#39;</span><span class="p">);</span>
-
-<span class="c1">// Configuration</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">API_BASE_URL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_API_URL</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ACCESS_TOKEN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_ACCESS_TOKEN</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">USERNAME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_USERNAME</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">PLATFORM</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;wa&#39;</span><span class="p">;</span><span class="w"> </span><span class="c1">// wa for WhatsApp, signal for Signal</span>
-
-<span class="c1">// Validate required configuration</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">ACCESS_TOKEN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">USERNAME</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">addDevice</span><span class="p">(</span><span class="nx">platform</span><span class="p">,</span><span class="w"> </span><span class="nx">username</span><span class="p">,</span><span class="w"> </span><span class="nx">accessToken</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cm">/** Add a new device for the specified platform */</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">API_BASE_URL</span><span class="si">}</span><span class="sb">/</span><span class="si">${</span><span class="nx">platform</span><span class="si">}</span><span class="sb">/devices`</span><span class="p">;</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">username</span><span class="o">:</span><span class="w"> </span><span class="nx">username</span><span class="w"> </span><span class="p">};</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="s1">&#39;Authorization&#39;</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">        </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/json&#39;</span>
-<span class="w">    </span><span class="p">};</span>
-
-<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="nx">payload</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="p">});</span>
-
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;✅ Device added successfully!&#39;</span><span class="p">);</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`WebSocket URL: </span><span class="si">${</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">.</span><span class="nx">websocket_url</span><span class="si">}</span><span class="sb">`</span><span class="p">);</span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">.</span><span class="nx">websocket_url</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;❌ Failed to add device:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">status</span><span class="p">);</span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
-<span class="w">        </span><span class="p">}</span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-
-<span class="kd">function</span><span class="w"> </span><span class="nx">connectWebSocket</span><span class="p">(</span><span class="nx">websocketUrl</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cm">/** Establish WebSocket connection */</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="nx">websocketUrl</span><span class="p">);</span>
-
-<span class="w">    </span><span class="nx">ws</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;open&#39;</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">open</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;🔌 WebSocket connection established&#39;</span><span class="p">);</span>
-<span class="w">    </span><span class="p">});</span>
-
-<span class="w">    </span><span class="nx">ws</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;message&#39;</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">message</span><span class="p">(</span><span class="nx">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;📨 Received message:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">toString</span><span class="p">());</span>
-<span class="w">    </span><span class="p">});</span>
-
-<span class="w">    </span><span class="nx">ws</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">error</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;❌ WebSocket error:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">);</span>
-<span class="w">    </span><span class="p">});</span>
-
-<span class="w">    </span><span class="nx">ws</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;close&#39;</span><span class="p">,</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">close</span><span class="p">(</span><span class="nx">code</span><span class="p">,</span><span class="w"> </span><span class="nx">reason</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;🔌 WebSocket connection closed&#39;</span><span class="p">);</span>
-<span class="w">    </span><span class="p">});</span>
-
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">ws</span><span class="p">;</span>
-<span class="p">}</span>
-
-<span class="c1">// Example usage</span>
-<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// Add device</span>
-<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;=== Adding Device ===&#39;</span><span class="p">);</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">websocketUrl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">addDevice</span><span class="p">(</span><span class="nx">PLATFORM</span><span class="p">,</span><span class="w"> </span><span class="nx">USERNAME</span><span class="p">,</span><span class="w"> </span><span class="nx">ACCESS_TOKEN</span><span class="p">);</span>
-
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">websocketUrl</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;\n=== Establishing WebSocket Connection ===&#39;</span><span class="p">);</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`Connecting to: </span><span class="si">${</span><span class="nx">websocketUrl</span><span class="si">}</span><span class="sb">`</span><span class="p">);</span>
-
-<span class="w">        </span><span class="c1">// Connect to WebSocket</span>
-<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">connectWebSocket</span><span class="p">(</span><span class="nx">websocketUrl</span><span class="p">);</span>
-
-<span class="w">        </span><span class="c1">// Keep the process alive</span>
-<span class="w">        </span><span class="nx">process</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;SIGINT&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;\n🛑 Shutting down...&#39;</span><span class="p">);</span>
-<span class="w">            </span><span class="nx">ws</span><span class="p">.</span><span class="nx">close</span><span class="p">();</span>
-<span class="w">            </span><span class="nx">process</span><span class="p">.</span><span class="nx">exit</span><span class="p">(</span><span class="mf">0</span><span class="p">);</span>
-<span class="w">        </span><span class="p">});</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-
-<span class="nx">main</span><span class="p">();</span>
-</pre></div>
-</div>
-</div><div aria-labelledby="tab-0-0-2" class="sphinx-tabs-panel" hidden="true" id="panel-0-0-2" name="0-2" role="tabpanel" tabindex="0"><div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?php</span>
-
-<span class="c1">// Load environment variables (requires vlucas/phpdotenv package)</span>
-<span class="nv">$dotenv</span> <span class="o">=</span> <span class="nx">Dotenv\Dotenv</span><span class="o">::</span><span class="na">createImmutable</span><span class="p">(</span><span class="no">__DIR__</span><span class="p">);</span>
-<span class="nv">$dotenv</span><span class="o">-&gt;</span><span class="na">load</span><span class="p">();</span>
-
-<span class="c1">// Configuration</span>
-<span class="nv">$API_BASE_URL</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_API_URL&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">;</span>
-<span class="nv">$ACCESS_TOKEN</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="k">null</span><span class="p">;</span>
-<span class="nv">$USERNAME</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_USERNAME&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="k">null</span><span class="p">;</span>
-<span class="nv">$PLATFORM</span> <span class="o">=</span> <span class="s1">&#39;wa&#39;</span><span class="p">;</span> <span class="c1">// wa for WhatsApp, signal for Signal</span>
-
-<span class="c1">// Validate required configuration</span>
-<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nv">$ACCESS_TOKEN</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">throw</span> <span class="k">new</span> <span class="nx">Exception</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nv">$USERNAME</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">throw</span> <span class="k">new</span> <span class="nx">Exception</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="k">function</span> <span class="nf">addDevice</span><span class="p">(</span><span class="nv">$apiBaseUrl</span><span class="p">,</span> <span class="nv">$platform</span><span class="p">,</span> <span class="nv">$username</span><span class="p">,</span> <span class="nv">$accessToken</span><span class="p">)</span> <span class="p">{</span>
-    <span class="sd">/** Add a new device for the specified platform */</span>
-    <span class="nv">$url</span> <span class="o">=</span> <span class="nv">$apiBaseUrl</span> <span class="o">.</span> <span class="s1">&#39;/&#39;</span> <span class="o">.</span> <span class="nv">$platform</span> <span class="o">.</span> <span class="s1">&#39;/devices&#39;</span><span class="p">;</span>
-    <span class="nv">$payload</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;username&#39;</span> <span class="o">=&gt;</span> <span class="nv">$username</span><span class="p">];</span>
-    <span class="nv">$headers</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s1">&#39;Authorization: Bearer &#39;</span> <span class="o">.</span> <span class="nv">$accessToken</span><span class="p">,</span>
-        <span class="s1">&#39;Content-Type: application/json&#39;</span>
-    <span class="p">];</span>
-
-    <span class="nv">$ch</span> <span class="o">=</span> <span class="nb">curl_init</span><span class="p">();</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_URL</span><span class="p">,</span> <span class="nv">$url</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_POST</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_POSTFIELDS</span><span class="p">,</span> <span class="nb">json_encode</span><span class="p">(</span><span class="nv">$payload</span><span class="p">));</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_HTTPHEADER</span><span class="p">,</span> <span class="nv">$headers</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_RETURNTRANSFER</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_HTTP_VERSION</span><span class="p">,</span> <span class="nx">CURL_HTTP_VERSION_1_1</span><span class="p">);</span>
-
-    <span class="nv">$response</span> <span class="o">=</span> <span class="nb">curl_exec</span><span class="p">(</span><span class="nv">$ch</span><span class="p">);</span>
-    <span class="nv">$httpCode</span> <span class="o">=</span> <span class="nb">curl_getinfo</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLINFO_HTTP_CODE</span><span class="p">);</span>
-    <span class="nb">curl_close</span><span class="p">(</span><span class="nv">$ch</span><span class="p">);</span>
-
-    <span class="k">if</span> <span class="p">(</span><span class="nv">$httpCode</span> <span class="o">==</span> <span class="mi">200</span><span class="p">)</span> <span class="p">{</span>
-        <span class="nv">$result</span> <span class="o">=</span> <span class="nb">json_decode</span><span class="p">(</span><span class="nv">$response</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
-        <span class="k">echo</span> <span class="s2">&quot;✅ Device added successfully!</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">echo</span> <span class="s2">&quot;WebSocket URL: &quot;</span> <span class="o">.</span> <span class="nv">$result</span><span class="p">[</span><span class="s1">&#39;websocket_url&#39;</span><span class="p">]</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">return</span> <span class="nv">$result</span><span class="p">[</span><span class="s1">&#39;websocket_url&#39;</span><span class="p">];</span>
-    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-        <span class="k">echo</span> <span class="s2">&quot;❌ Failed to add device: &quot;</span> <span class="o">.</span> <span class="nv">$httpCode</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">echo</span> <span class="s2">&quot;Response: &quot;</span> <span class="o">.</span> <span class="nv">$response</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">return</span> <span class="k">null</span><span class="p">;</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-
-<span class="k">function</span> <span class="nf">connectWebSocket</span><span class="p">(</span><span class="nv">$websocketUrl</span><span class="p">)</span> <span class="p">{</span>
-    <span class="sd">/** Establish WebSocket connection using Ratchet WebSocket client */</span>
-    <span class="c1">// Note: This requires the Ratchet WebSocket library</span>
-    <span class="c1">// composer require cboden/ratchet</span>
-
-    <span class="k">echo</span> <span class="s2">&quot;🔌 Connecting to WebSocket: &quot;</span> <span class="o">.</span> <span class="nv">$websocketUrl</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-    <span class="k">echo</span> <span class="s2">&quot;Note: WebSocket implementation requires additional libraries</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-    <span class="k">echo</span> <span class="s2">&quot;Consider using a WebSocket client library like Ratchet</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-
-    <span class="c1">// Example WebSocket connection code (requires Ratchet):</span>
-    <span class="cm">/*</span>
-<span class="cm">    $client = new \Ratchet\Client\WebSocket($websocketUrl);</span>
-<span class="cm">    $client-&gt;on(&#39;message&#39;, function($msg) {</span>
-<span class="cm">        echo &quot;📨 Received message: &quot; . $msg . &quot;\n&quot;;</span>
-<span class="cm">    });</span>
-<span class="cm">    $client-&gt;on(&#39;close&#39;, function() {</span>
-<span class="cm">        echo &quot;🔌 WebSocket connection closed\n&quot;;</span>
-<span class="cm">    });</span>
-<span class="cm">    $client-&gt;run();</span>
-<span class="cm">    */</span>
-<span class="p">}</span>
-
-<span class="c1">// Example usage</span>
-<span class="k">echo</span> <span class="s2">&quot;=== Adding Device ===</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-<span class="nv">$websocketUrl</span> <span class="o">=</span> <span class="nx">addDevice</span><span class="p">(</span><span class="nv">$API_BASE_URL</span><span class="p">,</span> <span class="nv">$PLATFORM</span><span class="p">,</span> <span class="nv">$USERNAME</span><span class="p">,</span> <span class="nv">$ACCESS_TOKEN</span><span class="p">);</span>
-
-<span class="k">if</span> <span class="p">(</span><span class="nv">$websocketUrl</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">echo</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">=== Establishing WebSocket Connection ===</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-    <span class="nx">connectWebSocket</span><span class="p">(</span><span class="nv">$websocketUrl</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="cp">?&gt;</span>
-</pre></div>
-</div>
-</div></div>
-</section>
-<section id="error-handling">
-<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h2>
-<p>The device addition endpoint returns appropriate HTTP status codes:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">200</span> <span class="pre">OK</span></code> - Device added successfully</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">400</span> <span class="pre">Bad</span> <span class="pre">Request</span></code> - Invalid request parameters</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">401</span> <span class="pre">Unauthorized</span></code> - Invalid or missing Bearer token</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">500</span> <span class="pre">Internal</span> <span class="pre">Server</span> <span class="pre">Error</span></code> - Server error</p></li>
-</ul>
-<p>Common error responses:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid request&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Username must be 3-32 characters&quot;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid access token&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Token validation failed&quot;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-</section>
-<section id="websocket-best-practices">
-<h2>WebSocket Best Practices<a class="headerlink" href="#websocket-best-practices" title="Link to this heading">¶</a></h2>
+<p>ShortMesh provides a web-based user interface for managing your devices. This guide explains how to add devices through the web UI console.</p>
+<section id="accessing-the-web-ui-console">
+<h2>Accessing the Web UI Console<a class="headerlink" href="#accessing-the-web-ui-console" title="Link to this heading">¶</a></h2>
 <ol class="arabic simple">
-<li><p><strong>Connection Management</strong>: Implement proper connection handling and reconnection logic</p></li>
-<li><p><strong>Message Handling</strong>: Process incoming messages according to your application needs</p></li>
-<li><p><strong>Error Handling</strong>: Handle WebSocket errors and connection drops gracefully</p></li>
-<li><p><strong>Resource Cleanup</strong>: Properly close WebSocket connections when done</p></li>
-<li><p><strong>Heartbeat</strong>: Implement heartbeat mechanisms to keep connections alive</p></li>
+<li><p><strong>Open your web browser</strong> and navigate to your ShortMesh web UI console</p></li>
+<li><p><strong>Log in</strong> to your ShortMesh account using your credentials</p></li>
+<li><p><strong>Navigate to the Devices section</strong> in the web UI</p></li>
 </ol>
 </section>
-<section id="example-environment-setup">
-<h2>Example Environment Setup<a class="headerlink" href="#example-environment-setup" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># .env file</span>
-<span class="nv">SHORTMESH_API_URL</span><span class="o">=</span>https://api.shortmesh.com
-<span class="nv">SHORTMESH_ACCESS_TOKEN</span><span class="o">=</span>your_access_token_here
-<span class="nv">SHORTMESH_USERNAME</span><span class="o">=</span>your_username
-</pre></div>
-</div>
+<section id="adding-a-new-device">
+<h2>Adding a New Device<a class="headerlink" href="#adding-a-new-device" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Click “Add Device”</strong> or the “+” button in the Devices section</p></li>
+<li><p><strong>Select your platform</strong> from the available options:
+- WhatsApp (wa)
+- Signal (coming soon)</p></li>
+<li><p><strong>Enter your username</strong> for the platform</p></li>
+<li><p><strong>Follow the platform-specific setup instructions</strong> displayed in the web UI</p></li>
+<li><p><strong>Complete the authentication process</strong> as guided by the web UI</p></li>
+</ol>
+</section>
+<section id="supported-platforms">
+<h2>Supported Platforms<a class="headerlink" href="#supported-platforms" title="Link to this heading">¶</a></h2>
+<p>The following platforms are currently supported:</p>
+<ul class="simple">
+<li><p><strong>WhatsApp (wa)</strong> - Connect your WhatsApp account</p></li>
+<li><p><strong>Signal</strong> - Coming soon</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h2>
+<p>Once you have added your devices through the web UI, you can proceed to:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="listing-devices.html"><span class="doc">Listing Devices</span></a> - Learn how to list your connected devices via API</p></li>
+<li><p><a class="reference internal" href="sending-messages.html"><span class="doc">Sending Messages</span></a> - Learn how to send messages through your devices</p></li>
+</ul>
+<p>The web UI provides a simple and intuitive way to manage your device connections without needing to use API calls for device setup.</p>
 </section>
 </section>
 
@@ -482,23 +151,19 @@
 	  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#api-base-url">API Base URL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#authentication">Authentication</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#platform-codes">Platform Codes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#error-handling">Error Handling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#best-practices">Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#basic-setup-examples">Basic Setup Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="getting-started.html#example-environment-setup">Example Environment Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#step-1-login-and-access">Step 1: Login and Access</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#step-2-add-devices">Step 2: Add Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#step-3-get-your-api-access-token">Step 3: Get Your API Access Token</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#step-4-send-messages">Step 4: Send Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#what-s-next">What’s Next?</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Adding Devices</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#accessing-the-web-ui-console">Accessing the Web UI Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-a-new-device">Adding a New Device</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#supported-platforms">Supported Platforms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#websocket-connection">WebSocket Connection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#code-examples">Code Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#websocket-best-practices">WebSocket Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#example-environment-setup">Example Environment Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="listing-devices.html">Listing Devices</a><ul>

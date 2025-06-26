@@ -9,25 +9,11 @@ You can list all devices for a specific platform to see what devices are availab
 - ``Authorization: Bearer YOUR_ACCESS_TOKEN``
 - ``Content-Type: application/json``
 
-**Request Body**:
-.. code-block:: json
+**Request Body**: 
+The request body contains your username. For detailed request body specifications, see the complete API documentation at https://api.shortmesh.com/
 
-   {
-     "username": "your_username"
-   }
-
-**Response**:
-.. code-block:: json
-
-   {
-     "devices": [
-       {
-         "device_id": "wa123456789",
-         "platform": "wa",
-         "status": "active"
-       }
-     ]
-   }
+**Response**: 
+The response contains an array of devices with their IDs, platforms, and status. For detailed response specifications, see the complete API documentation at https://api.shortmesh.com/
 
 Code Examples
 -------------

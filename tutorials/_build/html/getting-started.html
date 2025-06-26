@@ -8,7 +8,6 @@
     <title>Getting Started &#8212; ShortMesh 1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8e8a900e" />
       <link rel="stylesheet" type="text/css" href="_static/css/pdj.css?v=12f78f94" />
-      <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=a5c4661c" />
 
 <link rel="stylesheet" href="_static/css/darker.css" type="text/css"
       media="(prefers-color-scheme: dark)"/>
@@ -16,7 +15,6 @@
     <script src="_static/documentation_options.js?v=29a6c3e3"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script src="_static/tabs.js?v=3030b3cb"></script>
     <script src="_static/js/pdj.js"></script>
 
     <script type="module" src="_static/js/dark-mode-toggle.js"></script>
@@ -51,244 +49,55 @@
 	  </div>
   <section id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h1>
-<p>Welcome to the ShortMesh API documentation! This guide will help you integrate with the ShortMesh messaging bridge API to send messages across different platforms.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This tutorial assumes you have already:</p>
-<ul class="simple">
-<li><p>Created an account or logged in through the web interface</p></li>
-<li><p>Retrieved your API access token from the dashboard</p></li>
-<li><p>Added platforms to your devices through the web UI (which handles QR code scanning)</p></li>
-</ul>
-</div>
-<section id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
-<p>Before using the API, ensure you have:</p>
+<p>Welcome to the ShortMesh API documentation! This tutorial will guide you through the basic steps to get started with ShortMesh messaging bridge API.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>ShortMesh allows you to send messages across different messaging platforms through a unified API. This tutorial covers the essential steps to set up and use ShortMesh.</p>
+</section>
+<section id="step-1-login-and-access">
+<h2>Step 1: Login and Access<a class="headerlink" href="#step-1-login-and-access" title="Link to this heading">¶</a></h2>
 <ol class="arabic simple">
-<li><p><strong>API Access Token</strong>: Get this from your ShortMesh dashboard after logging in</p></li>
-<li><p><strong>Platform Setup</strong>: Add your messaging platforms (WhatsApp, Signal, etc.) through the web interface</p></li>
-<li><p><strong>Device Names</strong>: Note the device names for each platform you’ve configured</p></li>
+<li><p><strong>Visit the ShortMesh Web UI</strong>: Go to <a class="reference external" href="https://shortmesh.com">https://shortmesh.com</a></p></li>
+<li><p><strong>Create an account or log in</strong>: Use your credentials to access the web interface</p></li>
+<li><p><strong>Navigate to the dashboard</strong>: Once logged in, you’ll see your ShortMesh dashboard</p></li>
 </ol>
+<p>The web UI provides a user-friendly interface for managing your account, devices, and API access.</p>
 </section>
-<section id="api-base-url">
-<h2>API Base URL<a class="headerlink" href="#api-base-url" title="Link to this heading">¶</a></h2>
-<p>All API endpoints are relative to the ShortMesh API server:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>https://api.shortmesh.com
-</pre></div>
-</div>
-</section>
-<section id="authentication">
-<h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading">¶</a></h2>
-<p>All API requests require authentication using a Bearer token in the Authorization header:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Authorization: Bearer YOUR_ACCESS_TOKEN
-</pre></div>
-</div>
-</section>
-<section id="platform-codes">
-<h2>Platform Codes<a class="headerlink" href="#platform-codes" title="Link to this heading">¶</a></h2>
-<p>The following platform codes are supported:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">wa</span></code> - WhatsApp</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">signal</span></code> - Signal</p></li>
-</ul>
-</section>
-<section id="error-handling">
-<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h2>
-<p>The API returns appropriate HTTP status codes and error messages:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">200</span> <span class="pre">OK</span></code> - Request successful</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">400</span> <span class="pre">Bad</span> <span class="pre">Request</span></code> - Invalid request parameters</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">401</span> <span class="pre">Unauthorized</span></code> - Invalid or missing access token</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">500</span> <span class="pre">Internal</span> <span class="pre">Server</span> <span class="pre">Error</span></code> - Server error</p></li>
-</ul>
-<p>Error responses include details about what went wrong:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid request&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Username must be 3-32 characters&quot;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
-</section>
-<section id="best-practices">
-<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<section id="step-2-add-devices">
+<h2>Step 2: Add Devices<a class="headerlink" href="#step-2-add-devices" title="Link to this heading">¶</a></h2>
 <ol class="arabic simple">
-<li><p><strong>Store Access Tokens Securely</strong>: Never hardcode access tokens in your source code</p></li>
-<li><p><strong>Use Environment Variables</strong>: Store sensitive configuration in environment variables</p></li>
-<li><p><strong>Handle Errors Gracefully</strong>: Always check response status codes and handle errors appropriately</p></li>
-<li><p><strong>Validate Input</strong>: Ensure phone numbers are in E.164 format (without + prefix)</p></li>
-<li><p><strong>Rate Limiting</strong>: Be mindful of API rate limits in production environments</p></li>
+<li><p><strong>Access the Devices section</strong>: In the web UI, navigate to the Devices area</p></li>
+<li><p><strong>Add your messaging platforms</strong>: Connect your WhatsApp, Signal, or other supported platforms</p></li>
+<li><p><strong>Follow platform-specific setup</strong>: Each platform has its own authentication process (QR codes, etc.)</p></li>
+<li><p><strong>Verify device status</strong>: Ensure your devices are properly connected and ready</p></li>
 </ol>
+<p>For detailed instructions on adding devices, see <a class="reference internal" href="adding-devices.html"><span class="doc">Adding Devices</span></a>.</p>
 </section>
-<section id="basic-setup-examples">
-<h2>Basic Setup Examples<a class="headerlink" href="#basic-setup-examples" title="Link to this heading">¶</a></h2>
-<div class="sphinx-tabs docutils container">
-<div aria-label="Tabbed content" class="closeable" role="tablist"><button aria-controls="panel-0-0-0" aria-selected="true" class="sphinx-tabs-tab" id="tab-0-0-0" name="0-0" role="tab" tabindex="0">Python</button><button aria-controls="panel-0-0-1" aria-selected="false" class="sphinx-tabs-tab" id="tab-0-0-1" name="0-1" role="tab" tabindex="-1">JavaScript (Node.js)</button><button aria-controls="panel-0-0-2" aria-selected="false" class="sphinx-tabs-tab" id="tab-0-0-2" name="0-2" role="tab" tabindex="-1">PHP</button></div><div aria-labelledby="tab-0-0-0" class="sphinx-tabs-panel" id="panel-0-0-0" name="0-0" role="tabpanel" tabindex="0"><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">dotenv</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dotenv</span>
-
-<span class="c1"># Load environment variables</span>
-<span class="n">load_dotenv</span><span class="p">()</span>
-
-<span class="c1"># Configuration from environment variables</span>
-<span class="n">API_BASE_URL</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_API_URL&#39;</span><span class="p">,</span> <span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">)</span>
-<span class="n">ACCESS_TOKEN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN&#39;</span><span class="p">)</span>
-<span class="n">USERNAME</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME&#39;</span><span class="p">)</span>
-
-<span class="c1"># Validate required configuration</span>
-<span class="k">if</span> <span class="ow">not</span> <span class="n">ACCESS_TOKEN</span><span class="p">:</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SHORTMESH_ACCESS_TOKEN environment variable is required&quot;</span><span class="p">)</span>
-<span class="k">if</span> <span class="ow">not</span> <span class="n">USERNAME</span><span class="p">:</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SHORTMESH_USERNAME environment variable is required&quot;</span><span class="p">)</span>
-
-<span class="c1"># Common headers for all requests</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">get_headers</span><span class="p">():</span>
-    <span class="k">return</span> <span class="p">{</span>
-        <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">ACCESS_TOKEN</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span>
-    <span class="p">}</span>
-
-<span class="c1"># Example: Test API connection</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">test_connection</span><span class="p">():</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="c1"># Use the listing devices endpoint as a simple test</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">API_BASE_URL</span><span class="si">}</span><span class="s2">/wa/list/devices&quot;</span><span class="p">,</span>
-            <span class="n">headers</span><span class="o">=</span><span class="n">get_headers</span><span class="p">(),</span>
-            <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="n">USERNAME</span><span class="p">}</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✅ API connection successful!&quot;</span><span class="p">)</span>
-            <span class="k">return</span> <span class="kc">True</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ API connection failed: </span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
-            <span class="k">return</span> <span class="kc">False</span>
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Connection error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="kc">False</span>
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="n">test_connection</span><span class="p">()</span>
-</pre></div>
-</div>
-</div><div aria-labelledby="tab-0-0-1" class="sphinx-tabs-panel" hidden="true" id="panel-0-0-1" name="0-1" role="tabpanel" tabindex="0"><div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;dotenv&#39;</span><span class="p">).</span><span class="nx">config</span><span class="p">();</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">axios</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;axios&#39;</span><span class="p">);</span>
-
-<span class="c1">// Configuration from environment variables</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">API_BASE_URL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_API_URL</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ACCESS_TOKEN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_ACCESS_TOKEN</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">USERNAME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">SHORTMESH_USERNAME</span><span class="p">;</span>
-
-<span class="c1">// Validate required configuration</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">ACCESS_TOKEN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">USERNAME</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="c1">// Common headers for all requests</span>
-<span class="kd">function</span><span class="w"> </span><span class="nx">getHeaders</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="s1">&#39;Authorization&#39;</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">ACCESS_TOKEN</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">        </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/json&#39;</span>
-<span class="w">    </span><span class="p">};</span>
-<span class="p">}</span>
-
-<span class="c1">// Example: Test API connection</span>
-<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">testConnection</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="c1">// Use the listing devices endpoint as a simple test</span>
-<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span>
-<span class="w">            </span><span class="sb">`</span><span class="si">${</span><span class="nx">API_BASE_URL</span><span class="si">}</span><span class="sb">/wa/list/devices`</span><span class="p">,</span>
-<span class="w">            </span><span class="p">{</span><span class="w"> </span><span class="nx">username</span><span class="o">:</span><span class="w"> </span><span class="nx">USERNAME</span><span class="w"> </span><span class="p">},</span>
-<span class="w">            </span><span class="p">{</span><span class="w"> </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="nx">getHeaders</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
-<span class="w">        </span><span class="p">);</span>
-
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;✅ API connection successful!&#39;</span><span class="p">);</span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;❌ API connection failed:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">status</span><span class="p">);</span>
-<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
-<span class="w">        </span><span class="p">}</span>
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="p">}</span>
-
-<span class="c1">// Run the test</span>
-<span class="nx">testConnection</span><span class="p">();</span>
-</pre></div>
-</div>
-</div><div aria-labelledby="tab-0-0-2" class="sphinx-tabs-panel" hidden="true" id="panel-0-0-2" name="0-2" role="tabpanel" tabindex="0"><div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?php</span>
-
-<span class="c1">// Load environment variables (requires vlucas/phpdotenv package)</span>
-<span class="nv">$dotenv</span> <span class="o">=</span> <span class="nx">Dotenv\Dotenv</span><span class="o">::</span><span class="na">createImmutable</span><span class="p">(</span><span class="no">__DIR__</span><span class="p">);</span>
-<span class="nv">$dotenv</span><span class="o">-&gt;</span><span class="na">load</span><span class="p">();</span>
-
-<span class="c1">// Configuration from environment variables</span>
-<span class="nv">$API_BASE_URL</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_API_URL&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="s1">&#39;https://api.shortmesh.com&#39;</span><span class="p">;</span>
-<span class="nv">$ACCESS_TOKEN</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="k">null</span><span class="p">;</span>
-<span class="nv">$USERNAME</span> <span class="o">=</span> <span class="nv">$_ENV</span><span class="p">[</span><span class="s1">&#39;SHORTMESH_USERNAME&#39;</span><span class="p">]</span> <span class="o">??</span> <span class="k">null</span><span class="p">;</span>
-
-<span class="c1">// Validate required configuration</span>
-<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nv">$ACCESS_TOKEN</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">throw</span> <span class="k">new</span> <span class="nx">Exception</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_ACCESS_TOKEN environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nv">$USERNAME</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">throw</span> <span class="k">new</span> <span class="nx">Exception</span><span class="p">(</span><span class="s1">&#39;SHORTMESH_USERNAME environment variable is required&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="c1">// Common headers for all requests</span>
-<span class="k">function</span> <span class="nf">getHeaders</span><span class="p">(</span><span class="nv">$accessToken</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">return</span> <span class="p">[</span>
-        <span class="s1">&#39;Authorization: Bearer &#39;</span> <span class="o">.</span> <span class="nv">$accessToken</span><span class="p">,</span>
-        <span class="s1">&#39;Content-Type: application/json&#39;</span>
-    <span class="p">];</span>
-<span class="p">}</span>
-
-<span class="c1">// Example: Test API connection</span>
-<span class="k">function</span> <span class="nf">testConnection</span><span class="p">(</span><span class="nv">$apiBaseUrl</span><span class="p">,</span> <span class="nv">$accessToken</span><span class="p">,</span> <span class="nv">$username</span><span class="p">)</span> <span class="p">{</span>
-    <span class="nv">$ch</span> <span class="o">=</span> <span class="nb">curl_init</span><span class="p">();</span>
-
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_URL</span><span class="p">,</span> <span class="nv">$apiBaseUrl</span> <span class="o">.</span> <span class="s1">&#39;/wa/list/devices&#39;</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_POST</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_POSTFIELDS</span><span class="p">,</span> <span class="nb">json_encode</span><span class="p">([</span><span class="s1">&#39;username&#39;</span> <span class="o">=&gt;</span> <span class="nv">$username</span><span class="p">]));</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_HTTPHEADER</span><span class="p">,</span> <span class="nx">getHeaders</span><span class="p">(</span><span class="nv">$accessToken</span><span class="p">));</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_RETURNTRANSFER</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
-    <span class="nb">curl_setopt</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLOPT_HTTP_VERSION</span><span class="p">,</span> <span class="nx">CURL_HTTP_VERSION_1_1</span><span class="p">);</span>
-
-    <span class="nv">$response</span> <span class="o">=</span> <span class="nb">curl_exec</span><span class="p">(</span><span class="nv">$ch</span><span class="p">);</span>
-    <span class="nv">$httpCode</span> <span class="o">=</span> <span class="nb">curl_getinfo</span><span class="p">(</span><span class="nv">$ch</span><span class="p">,</span> <span class="nx">CURLINFO_HTTP_CODE</span><span class="p">);</span>
-    <span class="nb">curl_close</span><span class="p">(</span><span class="nv">$ch</span><span class="p">);</span>
-
-    <span class="k">if</span> <span class="p">(</span><span class="nv">$httpCode</span> <span class="o">==</span> <span class="mi">200</span><span class="p">)</span> <span class="p">{</span>
-        <span class="k">echo</span> <span class="s2">&quot;✅ API connection successful!</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">return</span> <span class="k">true</span><span class="p">;</span>
-    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-        <span class="k">echo</span> <span class="s2">&quot;❌ API connection failed: &quot;</span> <span class="o">.</span> <span class="nv">$httpCode</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">echo</span> <span class="s2">&quot;Response: &quot;</span> <span class="o">.</span> <span class="nv">$response</span> <span class="o">.</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">;</span>
-        <span class="k">return</span> <span class="k">false</span><span class="p">;</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-
-<span class="c1">// Run the test</span>
-<span class="nx">testConnection</span><span class="p">(</span><span class="nv">$API_BASE_URL</span><span class="p">,</span> <span class="nv">$ACCESS_TOKEN</span><span class="p">,</span> <span class="nv">$USERNAME</span><span class="p">);</span>
-
-<span class="cp">?&gt;</span>
-</pre></div>
-</div>
-</div></div>
+<section id="step-3-get-your-api-access-token">
+<h2>Step 3: Get Your API Access Token<a class="headerlink" href="#step-3-get-your-api-access-token" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Navigate to API settings</strong>: In the web UI, find the API or Developer section</p></li>
+<li><p><strong>Generate or copy your access token</strong>: This token will be used to authenticate your API requests</p></li>
+<li><p><strong>Store the token securely</strong>: Keep this token safe as it provides access to your account</p></li>
+</ol>
+<p><strong>Important</strong>: Never share your access token publicly or commit it to version control.</p>
 </section>
-<section id="example-environment-setup">
-<h2>Example Environment Setup<a class="headerlink" href="#example-environment-setup" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># .env file</span>
-<span class="nv">SHORTMESH_API_URL</span><span class="o">=</span>https://api.shortmesh.com
-<span class="nv">SHORTMESH_ACCESS_TOKEN</span><span class="o">=</span>your_access_token_here
-<span class="nv">SHORTMESH_USERNAME</span><span class="o">=</span>your_username
-</pre></div>
-</div>
+<section id="step-4-send-messages">
+<h2>Step 4: Send Messages<a class="headerlink" href="#step-4-send-messages" title="Link to this heading">¶</a></h2>
+<p>Once you have your devices set up and access token ready, you can start sending messages through the API.</p>
+<p>For detailed examples of how to send messages, see <a class="reference internal" href="sending-messages.html"><span class="doc">Sending Messages</span></a>.</p>
+<p>For information on listing your devices via API, see <a class="reference internal" href="listing-devices.html"><span class="doc">Listing Devices</span></a>.</p>
+</section>
+<section id="what-s-next">
+<h2>What’s Next?<a class="headerlink" href="#what-s-next" title="Link to this heading">¶</a></h2>
+<p>After completing these basic steps, you can:</p>
+<ul class="simple">
+<li><p><strong>Explore the API endpoints</strong> for more advanced features</p></li>
+<li><p><strong>Integrate ShortMesh into your applications</strong> using the provided code examples</p></li>
+<li><p><strong>Set up automated messaging workflows</strong> for your business needs</p></li>
+<li><p><strong>Monitor your message delivery</strong> through the web UI</p></li>
+</ul>
+<p>All device management and authentication is handled through the web UI at <a class="reference external" href="https://shortmesh.com">https://shortmesh.com</a>, while the API is used for sending messages and retrieving device information.</p>
 </section>
 </section>
 
@@ -354,23 +163,19 @@
 	  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#api-base-url">API Base URL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#authentication">Authentication</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#platform-codes">Platform Codes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#best-practices">Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#basic-setup-examples">Basic Setup Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#example-environment-setup">Example Environment Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-1-login-and-access">Step 1: Login and Access</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-add-devices">Step 2: Add Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-3-get-your-api-access-token">Step 3: Get Your API Access Token</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-4-send-messages">Step 4: Send Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-s-next">What’s Next?</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="adding-devices.html">Adding Devices</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#accessing-the-web-ui-console">Accessing the Web UI Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#adding-a-new-device">Adding a New Device</a></li>
 <li class="toctree-l2"><a class="reference internal" href="adding-devices.html#supported-platforms">Supported Platforms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#websocket-connection">WebSocket Connection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#code-examples">Code Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#error-handling">Error Handling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#websocket-best-practices">WebSocket Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#example-environment-setup">Example Environment Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html#next-steps">Next Steps</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="listing-devices.html">Listing Devices</a><ul>

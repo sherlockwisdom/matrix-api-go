@@ -9,24 +9,11 @@ Once you have devices set up through the web UI, you can send messages to contac
 - ``Authorization: Bearer YOUR_ACCESS_TOKEN``
 - ``Content-Type: application/json``
 
-**Request Body**:
-.. code-block:: json
+**Request Body**: 
+The request body contains your username, message content, and device name. For detailed request body specifications, see the complete API documentation at https://api.shortmesh.com/
 
-   {
-     "username": "your_username",
-     "message": "Hello from ShortMesh!",
-     "device_name": "wa123456789"
-   }
-
-**Response**:
-.. code-block:: json
-
-   {
-     "contact": "+1234567890",
-     "event_id": "$1234567890abcdef",
-     "message": "Hello from ShortMesh!",
-     "status": "sent"
-   }
+**Response**: 
+The response contains the contact information, event ID, message content, and delivery status. For detailed response specifications, see the complete API documentation at https://api.shortmesh.com/
 
 Code Examples
 -------------
