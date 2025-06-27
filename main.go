@@ -67,6 +67,13 @@ type ClientBridgeJsonRequest struct {
 	Username string `json:"username" example:"john_doe"`
 }
 
+type ClientWebhookJsonRequest struct {
+	Username   string `json:"username" example:"john_doe"`
+	DeviceName string `json:"device_name" example:"wa123456789"`
+	URL        string `json:"url" example:"https://example.com"`
+	Method     string `json:"method" example:"POST"`
+}
+
 // LoginResponse represents the response for successful login
 // @Description Response payload for successful login
 type LoginResponse struct {
@@ -99,6 +106,18 @@ type MessageResponse struct {
 // @Description - Closes when receiving nil data (indicating end of session or error)
 type DeviceResponse struct {
 	WebsocketURL string `json:"websocket_url" example:"ws://localhost:8080/ws/telegram/john_doe"`
+}
+
+// Webhook represents a webhook configuration
+// @Description Represents a webhook structure with device name, URL, method, and timestamp
+// @name Webhook
+// @type object
+type Webhook struct {
+	ID             int    `json:"id"`
+	ClientUsername string `json:"client_username"`
+	DeviceName     string `json:"device_name"`
+	URL            string `json:"url"`
+	Method         string `json:"method"`
 }
 
 // Input validation functions
@@ -605,10 +624,60 @@ func ApiListDevices(c *gin.Context) {
 }
 
 func ApiListWebhooks(c *gin.Context) {
-
 }
 
+// @Summary Adds a webhook for a given device
+// @Description Adds a webhook for a given device
+// @Accept  json
+// @Produce  json
+// @Param   platform path string true "Platform Name" example:"wa"
+// @Param   device_name path string true "Device Name" example:"wa123456789"
+// @Param   url query string true "URL" example:"https://example.com"
+// @Param   method query string true "Method" example:"POST"
+// @Param   Authorization header string true "Bearer token" example:"Bearer syt_YWxwaGE..."
+// @Success 200 {object} map[string]interface{} "Webhook added successfully"
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Invalid or missing Bearer token"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{platform}/device/{device_name}/webhook [post]
 func ApiAddWebhook(c *gin.Context) {
+	var webhookJsonRequest ClientWebhookJsonRequest
+
+	// Extract Bearer token from Authorization header
+	accessToken, err := extractBearerToken(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	username, err := sanitizeUsername(webhookJsonRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	client, err := mautrix.NewClient(
+		cfg.HomeServer, id.NewUserID(username, cfg.HomeServerDomain), accessToken)
+
+	if err != nil {
+		log.Printf("Failed to create Matrix client: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not initialize client"})
+		return
+	}
+
+	controller := Controller{
+		Client:   client,
+		Username: username,
+		UserID:   client.UserID,
+	}
+
+	err = controller.AddWebhook(webhookJsonRequest.DeviceName, webhookJsonRequest.URL, webhookJsonRequest.Method)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
 
 }
 
@@ -656,8 +725,8 @@ func main() {
 	router.POST("/:platform/message/:contact", ApiSendMessage)
 
 	router.POST("/:platform/list/devices", ApiListDevices)
-	router.POST("/:platform/webhooks", ApiListWebhooks)
-	router.POST("/:platform/device/:device_id/webhook", ApiAddWebhook)
+	router.POST("/:platform/list/webhooks", ApiListWebhooks)
+	router.POST("/:platform/device/:device_name/webhook", ApiAddWebhook)
 
 	router.DELETE("/", ApiDeleteAccount)
 	router.DELETE("/devices/:device_id", ApiDeleteDevice)

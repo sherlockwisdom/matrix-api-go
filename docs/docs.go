@@ -113,6 +113,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/{platform}/device/{device_name}/webhook": {
+            "post": {
+                "description": "Adds a webhook for a given device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Adds a webhook for a given device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Platform Name",
+                        "name": "platform",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Device Name",
+                        "name": "device_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL",
+                        "name": "url",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Method",
+                        "name": "method",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Webhook added successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing Bearer token",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/{platform}/devices": {
             "post": {
                 "description": "Registers a new device connection for the specified platform and establishes a websocket connection.\nThe websocket connection will:\n- Receive media/images from the platform bridge\n- Handle login synchronization events\n- Send existing active sessions if available\n- Close connection when receiving nil data (indicating end of session or error)\nHere are various platforms supported:\n'wa' (for WhatsApp)\n'signal' (for Signal)",
@@ -392,7 +468,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "ShortMesh API",
-	Description:      "Response payload for successful device addition. The websocket_url is used to establish a connection that:\n- Receives media/images from the platform bridge\n- Handles login synchronization events\n- Receives existing active sessions if available\n- Closes when receiving nil data (indicating end of session or error)",
+	Description:      "Represents a webhook structure with device name, URL, method, and timestamp",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

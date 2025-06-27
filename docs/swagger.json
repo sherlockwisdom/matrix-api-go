@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Response payload for successful device addition. The websocket_url is used to establish a connection that:\n- Receives media/images from the platform bridge\n- Handles login synchronization events\n- Receives existing active sessions if available\n- Closes when receiving nil data (indicating end of session or error)",
+        "description": "Represents a webhook structure with device name, URL, method, and timestamp",
         "title": "ShortMesh API",
         "contact": {},
         "version": "1.0"
@@ -98,6 +98,82 @@
                     },
                     "401": {
                         "description": "Login failed",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/{platform}/device/{device_name}/webhook": {
+            "post": {
+                "description": "Adds a webhook for a given device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Adds a webhook for a given device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Platform Name",
+                        "name": "platform",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Device Name",
+                        "name": "device_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL",
+                        "name": "url",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Method",
+                        "name": "method",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Webhook added successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or missing Bearer token",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
