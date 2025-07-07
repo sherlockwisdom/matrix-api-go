@@ -229,7 +229,7 @@ func (b *Bridges) AddDevice(ch *chan []byte) error {
 	return nil
 }
 
-func (b *Bridges) JoinRooms() error {
+func (b *Bridges) JoinManagementRooms() error {
 	joinedRooms, err := b.Client.JoinedRooms(context.Background())
 	log.Println("Joined rooms:", joinedRooms)
 

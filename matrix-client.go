@@ -67,7 +67,7 @@ func (m *MatrixClient) ProcessActiveSessions(
 				BotName: config.BotName,
 			}
 
-			err := bridge.JoinRooms()
+			err := bridge.JoinManagementRooms()
 			if err != nil {
 				return err
 			}
@@ -252,6 +252,10 @@ func (m *MatrixClient) syncClient(user Users) error {
 
 	clientDb.Init()
 	bridges, err := clientDb.FetchBridgeRooms(user.Username)
+	if err != nil {
+		log.Println("Error fetching bridge rooms for user:", err, user.Username)
+		return err
+	}
 
 	ch := make(chan *event.Event)
 	go func() {
